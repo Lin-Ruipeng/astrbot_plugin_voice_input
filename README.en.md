@@ -13,7 +13,7 @@ voice messages get voice replies.**
 [![version](https://img.shields.io/badge/version-2.0.0-blue)](metadata.yaml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-[简体中文](README.md) ｜ **English**
+[简体中文](README.md) ｜ **English** ｜ [Changelog](CHANGELOG.md)
 
 </div>
 
@@ -265,6 +265,8 @@ pip install pytest pyyaml packaging ruff
 ruff check . && ruff format --check .
 pytest
 ```
+
+See [CHANGELOG.md](CHANGELOG.md) for the change history.
 
 Tests cover the pure logic (detection signals, probability clamping, rolls, skip rules, Volcano stream parsing)
 plus release-metadata consistency (semver, `repo` field, config/schema alignment, no deprecated `@register`).

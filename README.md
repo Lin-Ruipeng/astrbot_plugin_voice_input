@@ -12,7 +12,7 @@
 [![version](https://img.shields.io/badge/version-2.0.0-blue)](metadata.yaml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-**简体中文** ｜ [English](README.en.md)
+**简体中文** ｜ [English](README.en.md) ｜ [变更记录](CHANGELOG.md)
 
 </div>
 
@@ -250,6 +250,8 @@ pip install pytest pyyaml packaging ruff
 ruff check . && ruff format --check .
 pytest
 ```
+
+变更历史见 [CHANGELOG.md](CHANGELOG.md)。
 
 测试覆盖纯函数判定（检测信号、概率钳值、抽签、跳过规则、火山流式解析）与发布元数据一致性
 （版本号语义化、`repo` 字段、配置项与代码对齐、不再使用废弃的 `@register`），**不需要安装 AstrBot**。
