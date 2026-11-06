@@ -1,0 +1,30 @@
+[project]
+name = "astrbot-plugin-voice-input"
+version = "1.0.0"
+description = "AstrBot plugin: detect whether an incoming message is a voice message"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "pyyaml>=6",
+    "packaging>=23",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+extend-exclude = [".git", "__pycache__", ".pytest_cache", ".ruff_cache", "PLAN.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "BLE"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
