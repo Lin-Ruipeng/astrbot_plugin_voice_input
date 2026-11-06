@@ -34,8 +34,16 @@ def test_version_is_semver_without_prefix(metadata: dict[str, Any]) -> None:
     assert SEMVER_RE.match(metadata["version"]), "version 必须是纯语义化版本，不能带 v"
 
 
-def test_plugin_name_matches_directory(metadata: dict[str, Any]) -> None:
-    assert metadata["name"] == ROOT.name
+def test_plugin_name_follows_convention(metadata: dict[str, Any]) -> None:
+    """插件名会被当成模块名与安装目录名，所以要符合 AstrBot 的命名惯例。
+
+    这里**不**和检出目录名比较：`git clone` 到任意目录（或下载 GitHub 的
+    zip 得到 ``xxx-main``）都会让那个断言假失败。
+    """
+
+    name = metadata["name"]
+    assert re.fullmatch(r"astrbot_plugin_[a-z0-9_]+", name), name
+    assert name.isidentifier(), name
 
 
 def test_repo_points_at_github(metadata: dict[str, Any]) -> None:
