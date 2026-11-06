@@ -1,17 +1,21 @@
 {
-    "enable": {
+    "inject_prompt": {
         "type": "bool",
-        "description": "启用语音门控",
-        "default": true
+        "description": "检测到语音输入时，向系统提示词追加一条语音回复指令",
+        "hint": "这是可选策略，默认关闭。插件本身只负责识别输入模态，回不回语音由你决定；示例见仓库 examples/ 目录。",
+        "obvious_hint": true,
+        "default": false
     },
     "prompt_text": {
-        "type": "string",
-        "description": "检测到语音输入时追加到系统提示词的内容",
-        "default": "【语音输入】用户这条消息是用语音发来的，请必须使用语音（调用 clone_tts 工具）回复，不要只发文字。语气按人格设定来。"
+        "type": "text",
+        "description": "开启 inject_prompt 后追加到系统提示词的内容",
+        "hint": "除非你确认所有使用者都装了同一个 TTS 插件，否则不要在文案里写死它的工具名。",
+        "default": "【语音输入】用户这条消息是语音发来的，请用语音回复。如果当前没有可用的语音合成能力，就用文字回复并说明原因。"
     },
-    "debug_log": {
+    "verbose_log": {
         "type": "bool",
-        "description": "把命中记录写到 /tmp/voice_gate.log，便于排查",
-        "default": true
+        "description": "把判定细节（各个信号）输出到 debug 日志",
+        "hint": "需要把日志级别调到 DEBUG 才能看到；生产环境建议保持关闭。",
+        "default": false
     }
 }

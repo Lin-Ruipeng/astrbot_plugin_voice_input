@@ -1,112 +1,152 @@
-"""语音输入门控插件。
+"""语音输入识别插件。
 
-作用：在 LLM 请求之前判断这条用户消息是不是语音发来的。
-如果是，就往系统提示词里追加一条指令，要求 AI 也用语音回复。
+只做一件事：判断本轮用户消息是不是**语音发来的**，并把结论写到事件上。
 
-原理：
-AstrBot 的预处理阶段会把语音消息转成文字（STT），并把 Record 组件
-原地替换成 Plain，插件层面已经看不到语音了。
-但预处理同时会把转码后的 wav 临时文件登记到事件对象上，
-所以这里通过检查事件挂着的临时媒体文件后缀来判断。
+    from astrbot.api.event import AstrMessageEvent
+
+    if event.get_extra("voice_input"):
+        ...
+
+"要不要用语音回复"、"用哪个 TTS"属于使用者的回复策略，本插件不参与。
+需要现成策略时参考仓库里的 ``examples/``。
 """
 
-import os
+from __future__ import annotations
 
-from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.message_components import Record
 from astrbot.api.provider import ProviderRequest
-from astrbot.api.star import Context, Star, register
+from astrbot.api.star import Context, Star
 
-AUDIO_EXTS = (
-    ".wav",
-    ".mp3",
-    ".ogg",
-    ".amr",
-    ".silk",
-    ".m4a",
-    ".flac",
-    ".aac",
-    ".opus",
-    ".wma",
-)
+from .detection import detect_voice_input
+
+VOICE_INPUT_KEY = "voice_input"
+"""对外暴露的键名：``event.get_extra("voice_input")``，恒为 ``bool``。"""
 
 DEFAULT_PROMPT = (
-    "【语音输入】用户这条消息是用语音发来的，请必须使用语音（调用 clone_tts 工具）回复，"
-    "不要只发文字。语气按人格设定来。"
+    "【语音输入】用户这条消息是语音发来的，请用语音回复。"
+    "如果当前没有可用的语音合成能力，就用文字回复并说明原因。"
 )
 
-DEBUG_LOG = "/tmp/voice_gate.log"
+_TEMP_FILES_ATTR = "_temporary_local_files"
+"""AstrBot 预处理阶段登记的临时媒体文件列表（>= v4.27.3）。"""
+
+_ANNOUNCED_KEY = "_voice_input_announced"
+"""内部标记：保证每个事件只打一条 info 日志。"""
 
 
-def _debug(msg: str) -> None:
-    try:
-        with open(DEBUG_LOG, "a", encoding="utf-8") as f:
-            from datetime import datetime
+class VoiceInputPlugin(Star):
+    """识别语音输入，并把结果写入 ``event.set_extra("voice_input", bool)``。"""
 
-            f.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}\n")
-    except Exception:
-        pass
-
-
-@register(
-    "astrbot_plugin_voice_gate",
-    "self",
-    "语音输入门控",
-    "v1.0.0",
-    "识别语音输入并要求 AI 用语音回复",
-)
-class VoiceGatePlugin(Star):
     def __init__(self, context: Context, config: dict | None = None) -> None:
         super().__init__(context)
         self.config = config or {}
+        self._warned_missing_temp_files = False
 
-    def _is_voice_input(self, event: AstrMessageEvent) -> bool:
-        """判断这条消息是不是语音发来的。"""
-        # 1) 消息链里还有 Record（某些时序下预处理尚未替换）
+    # ------------------------------------------------------------------ hooks
+
+    @filter.on_llm_request(priority=100)
+    async def on_llm_request(
+        self,
+        event: AstrMessageEvent,
+        req: ProviderRequest,
+    ) -> None:
+        """写标志；可选地把"用语音回复"追加进系统提示词。"""
+        is_voice = self._mark(event)
+        if is_voice:
+            self._inject_prompt(req)
+
+    @filter.on_decorating_result(priority=100)
+    async def on_decorating_result(self, event: AstrMessageEvent) -> None:
+        """让命令类等非 LLM 回复也能读到标志。"""
+        self._mark(event)
+
+    # -------------------------------------------------------------- detection
+
+    def _mark(self, event: AstrMessageEvent) -> bool:
+        """计算并写入 ``voice_input``，返回本轮判定结果。"""
+        has_record = self._has_record_component(event)
+        local_files = self._temporary_local_files(event)
+        raw_message = getattr(getattr(event, "message_obj", None), "raw_message", None)
+
+        is_voice = detect_voice_input(
+            has_record=has_record,
+            local_files=local_files,
+            raw_message=raw_message,
+        )
+        event.set_extra(VOICE_INPUT_KEY, is_voice)
+
+        if self._verbose_log:
+            self.logger.debug(
+                "[voice_input] has_record=%s temp_files=%s raw=%s -> voice_input=%s",
+                has_record,
+                [str(path) for path in local_files],
+                raw_message is not None,
+                is_voice,
+            )
+
+        if not event.get_extra(_ANNOUNCED_KEY):
+            event.set_extra(_ANNOUNCED_KEY, True)
+            self.logger.info(
+                "[voice_input] 本轮消息判定为%s",
+                "语音输入" if is_voice else "文字输入",
+            )
+        return is_voice
+
+    def _has_record_component(self, event: AstrMessageEvent) -> bool:
+        """信号 A：消息链里是否还有 ``Record``。"""
+        get_messages = getattr(event, "get_messages", None)
+        if get_messages is None:
+            return False
         try:
-            for comp in event.get_messages():
-                if type(comp).__name__ == "Record":
-                    return True
-        except Exception:
-            pass
+            messages = get_messages()
+        except Exception:  # noqa: BLE001 - 取不到消息链就当作没有
+            self.logger.debug("[voice_input] 读取消息链失败", exc_info=True)
+            return False
+        return any(isinstance(component, Record) for component in messages or [])
 
-        # 2) 事件上登记的临时媒体文件，语音会被转成 wav
+    def _temporary_local_files(self, event: AstrMessageEvent) -> list[str]:
+        """信号 C：预处理阶段登记的临时媒体文件。"""
+        files = getattr(event, _TEMP_FILES_ATTR, None)
+        if files is None:
+            if not self._warned_missing_temp_files:
+                self._warned_missing_temp_files = True
+                self.logger.warning(
+                    "[voice_input] 当前 AstrBot 没有 %s，语音判定只能依赖 "
+                    "Record 组件与原始消息段（请确认 AstrBot >= 4.27.3）。",
+                    _TEMP_FILES_ATTR,
+                )
+            return []
         try:
-            files = getattr(event, "_temporary_local_files", None) or []
-        except Exception:
-            files = []
-        for f in files:
-            if str(f).lower().endswith(AUDIO_EXTS):
-                return True
+            return [str(path) for path in files]
+        except TypeError:
+            self.logger.debug("[voice_input] %s 不是可迭代对象", _TEMP_FILES_ATTR)
+            return []
 
-        # 3) 其他插件/流程打的标记
-        try:
-            if event.get_extra("is_voice_input"):
-                return True
-        except Exception:
-            pass
+    # ---------------------------------------------------------------- inject
 
-        return False
-
-    @filter.on_llm_request()
-    async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
-        """在请求模型前注入语音标记。"""
-        if not self._is_voice_input(event):
+    def _inject_prompt(self, req: ProviderRequest) -> None:
+        """可选策略：把 ``prompt_text`` 追加到系统提示词（默认关闭）。"""
+        if not self._inject_prompt_enabled:
             return
 
-        try:
-            event.set_extra("is_voice_input", True)
-        except Exception:
-            pass
-
-        prompt = self.config.get("prompt_text") or DEFAULT_PROMPT
-        if not prompt.strip():
+        prompt = (self.config.get("prompt_text") or DEFAULT_PROMPT).strip()
+        if not prompt:
             return
 
         base = getattr(req, "system_prompt", "") or ""
-        if prompt.strip() in base:
+        if prompt in base:
             return
 
         req.system_prompt = f"{base}\n{prompt}" if base else prompt
-        logger.info("[voice_gate] 检测到语音输入，已注入语音回复指令")
-        _debug("detected voice input, prompt injected")
+        self.logger.debug("[voice_input] 已向系统提示词追加语音回复指令")
+
+    # ----------------------------------------------------------------- config
+
+    @property
+    def _inject_prompt_enabled(self) -> bool:
+        return bool(self.config.get("inject_prompt", False))
+
+    @property
+    def _verbose_log(self) -> bool:
+        return bool(self.config.get("verbose_log", False))

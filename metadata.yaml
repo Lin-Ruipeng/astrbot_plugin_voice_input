@@ -1,12 +1,20 @@
-name: astrbot_plugin_voice_gate
-display_name: 语音输入门控
-short_desc: 识别消息是否为语音输入，并提示 AI 用语音回复
-desc: 在 LLM 请求前检测本轮消息是否来自语音，若是则向系统提示词注入一条指令，要求 AI 用语音回复。
-version: v1.0.0
-author: self
-repo: ""
-astrbot_version: ">=4.0.0"
+name: astrbot_plugin_voice_input
+display_name: 语音输入识别
+short_desc: 识别消息是否来自语音输入，把结果交给其它插件
+desc: |
+  在 LLM 请求前判断本轮用户消息是否来自语音，并把结论写入
+  `event.set_extra("voice_input", True/False)`，由其它插件自行决定怎么处理。
+
+  它只负责识别输入模态，不改变任何回复行为。想实现"发语音就回语音"，
+  可以照抄仓库 `examples/` 里的两个可直接运行的示例：
+  一个用 AstrBot 自带 TTS，一个用音色克隆插件。
+version: 1.0.0
+author: Lin-Ruipeng
+repo: https://github.com/Lin-Ruipeng/astrbot_plugin_voice_input
+astrbot_version: ">=4.27.3,<5"
 tags:
   - 语音
-  - 门控
-  - tts
+  - 语音输入
+  - STT
+  - 多模态
+  - voice
