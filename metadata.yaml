@@ -1,0 +1,12 @@
+name: astrbot_plugin_voice_gate
+display_name: 语音输入门控
+short_desc: 识别消息是否为语音输入，并提示 AI 用语音回复
+desc: 在 LLM 请求前检测本轮消息是否来自语音，若是则向系统提示词注入一条指令，要求 AI 用语音回复。
+version: v1.0.0
+author: self
+repo: ""
+astrbot_version: ">=4.0.0"
+tags:
+  - 语音
+  - 门控
+  - tts
