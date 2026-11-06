@@ -9,7 +9,7 @@
 [![简体中文](https://img.shields.io/badge/文档-简体中文-blue)](README.md)
 [![English](https://img.shields.io/badge/docs-English-blue)](README.en.md)
 [![AstrBot](https://img.shields.io/badge/AstrBot-%3E%3D4.27.3-blue)](https://astrbot.app)
-[![version](https://img.shields.io/badge/version-1.0.0-blue)](metadata.yaml)
+[![version](https://img.shields.io/badge/version-1.0.1-blue)](metadata.yaml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 **简体中文** ｜ [English](README.en.md)
@@ -52,7 +52,7 @@ event.get_extra("voice_input")  # True = 语音，False = 文字
 | 项 | 说明 |
 | --- | --- |
 | AstrBot | **>= 4.27.3**（判定依赖该版本引入的 `_temporary_local_files`；更早版本只能在 STT 关闭时识别） |
-| 平台 | `aiocqhttp`（OneBot v11 / NapCat / LLOneBot 等）实测最准；其它平台退化为"临时音频文件后缀"判定，未经测试 |
+| 平台 | `aiocqhttp`（OneBot v11 / NapCat / LLOneBot 等）与 `qq_official`（QQ 官方机器人）均已实测；其它平台退化为“临时音频文件后缀”判定，未经测试 |
 | STT | **不需要开启**。检测独立于 STT；但 AI 要读懂语音内容仍需 STT |
 
 ## 快速验证
@@ -105,7 +105,7 @@ class MyVoicePolicy(Star):
 | --- | --- | --- | --- |
 | `inject_prompt` | bool | `false` | 检测到语音时，往系统提示词追加 `prompt_text`。**这是可选策略，不是插件的本职** |
 | `prompt_text` | text | 见下 | 仅在 `inject_prompt` 打开时生效。默认文案不点名任何 TTS 插件 |
-| `verbose_log` | bool | `false` | 把 has_record / 临时文件 / raw 三个信号打到 debug 日志 |
+| `verbose_log` | bool | `false` | 把 has_record / 临时文件 / raw_signal 三个信号打到 debug 日志 |
 
 默认文案：
 
@@ -118,7 +118,7 @@ class MyVoicePolicy(Star):
 | 信号 | 来源 | 说明 |
 | --- | --- | --- |
 | A 残留 `Record` | `event.get_messages()` | STT 关闭或失败时才成立 |
-| B 原始消息段 | `event.message_obj.raw_message.message` 含 `type == "record"` | OneBot v11 最准，只反映"用户本条消息" |
+| B 原始消息段 | OneBot：`raw_message.message` 含 `type == "record"`；QQ 官方：`raw_message.attachments` 里 `content_type` 以 `voice` 开头（或音频文件名） | 只看“本条消息自己”，被引用的语音不算 |
 | C 临时音频后缀 | `event._temporary_local_files` | 预处理的兜底依据（图片也会登记，故按后缀过滤） |
 
 判定逻辑本身在 [`detection.py`](detection.py)，是不导入 `astrbot` 的纯函数。
@@ -126,7 +126,7 @@ class MyVoicePolicy(Star):
 ## 已知限制
 
 1. 判定依赖 AstrBot 的 `_temporary_local_files`（>= 4.27.3）。属性缺失时插件会打一条 warning 而不是静默失效。
-2. 在**拿不到原始消息段**的平台（非 OneBot）上，若 STT 开启，一条"文字消息引用了一条语音"会被判为语音输入 —— 因为临时文件里确实有那条语音的音频。
+2. 在**拿不到原始消息**的平台（既不是 OneBot v11，也不是 QQ 官方）上，若 STT 开启，一条"文字消息引用了一条语音"会被判为语音输入 —— 因为临时文件里确实有那条语音的音频。想要准，就在 `detection.py` 里给这个平台补一个 `raw_voice_signal()` 分支。
 3. 只影响 LLM 请求与发送前钩子，不影响消息内容本身，也不保证在流式输出下时序正确。
 4. 插件不产生音频。能不能真的发出语音，取决于你配置的 TTS 能力。
 

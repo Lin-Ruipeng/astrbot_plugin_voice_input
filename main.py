@@ -18,7 +18,7 @@ from astrbot.api.message_components import Record
 from astrbot.api.provider import ProviderRequest
 from astrbot.api.star import Context, Star
 
-from .detection import detect_voice_input
+from .detection import detect_voice_input, raw_voice_signal
 
 VOICE_INPUT_KEY = "voice_input"
 """对外暴露的键名：``event.get_extra("voice_input")``，恒为 ``bool``。"""
@@ -78,10 +78,11 @@ class VoiceInputPlugin(Star):
 
         if self._verbose_log:
             self.logger.debug(
-                "[voice_input] has_record=%s temp_files=%s raw=%s -> voice_input=%s",
+                "[voice_input] has_record=%s temp_files=%s raw_signal=%s "
+                "-> voice_input=%s",
                 has_record,
                 [str(path) for path in local_files],
-                raw_message is not None,
+                raw_voice_signal(raw_message),
                 is_voice,
             )
 

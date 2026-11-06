@@ -8,7 +8,7 @@ desc: |
   它只负责识别输入模态，不改变任何回复行为。想实现"发语音就回语音"，
   可以照抄仓库 `examples/` 里的两个可直接运行的示例：
   一个用 AstrBot 自带 TTS，一个用音色克隆插件。
-version: 1.0.0
+version: 1.0.1
 author: Lin-Ruipeng
 repo: https://github.com/Lin-Ruipeng/astrbot_plugin_voice_input
 astrbot_version: ">=4.27.3,<5"

@@ -1,6 +1,6 @@
 [project]
 name = "astrbot-plugin-voice-input"
-version = "1.0.0"
+version = "1.0.1"
 description = "AstrBot plugin: detect whether an incoming message is a voice message"
 requires-python = ">=3.10"
 license = { text = "MIT" }

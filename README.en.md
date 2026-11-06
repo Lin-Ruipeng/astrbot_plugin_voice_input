@@ -9,7 +9,7 @@
 [![简体中文](https://img.shields.io/badge/文档-简体中文-blue)](README.md)
 [![English](https://img.shields.io/badge/docs-English-blue)](README.en.md)
 [![AstrBot](https://img.shields.io/badge/AstrBot-%3E%3D4.27.3-blue)](https://astrbot.app)
-[![version](https://img.shields.io/badge/version-1.0.0-blue)](metadata.yaml)
+[![version](https://img.shields.io/badge/version-1.0.1-blue)](metadata.yaml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 [简体中文](README.md) ｜ **English**
@@ -54,7 +54,7 @@ reads the flag.
 | | |
 | --- | --- |
 | AstrBot | **>= 4.27.3** (detection relies on `_temporary_local_files`, introduced there) |
-| Platforms | `aiocqhttp` (OneBot v11: NapCat, LLOneBot, …) is the tested, most accurate path; other platforms fall back to the temp-audio-suffix signal and are untested |
+| Platforms | `aiocqhttp` (OneBot v11: NapCat, LLOneBot, …) and `qq_official` are both tested and accurate; other platforms fall back to the temp-audio-suffix signal and are untested |
 | STT | **Not required** for detection. It is still required for the model to understand what was said |
 
 ## Quick check
@@ -109,7 +109,7 @@ Two **runnable** examples live in [`examples/`](examples/):
 | --- | --- | --- | --- |
 | `inject_prompt` | bool | `false` | Append `prompt_text` to the system prompt when voice is detected. **An optional policy, not the plugin's job** |
 | `prompt_text` | text | see below | Only used when `inject_prompt` is on. The default names no specific TTS plugin |
-| `verbose_log` | bool | `false` | Log the three signals at debug level |
+| `verbose_log` | bool | `false` | Log the three signals (has_record / temp files / raw_signal) at debug level |
 
 Default text:
 
@@ -122,7 +122,7 @@ Three signals; any hit means voice. When the platform's raw message segments are
 | Signal | Source | Notes |
 | --- | --- | --- |
 | A leftover `Record` | `event.get_messages()` | Only when STT is off or failed |
-| B raw segments | `event.message_obj.raw_message.message` containing `type == "record"` | Most accurate on OneBot v11; reflects only this message |
+| B raw message | OneBot: `raw_message.message` containing `type == "record"`; QQ official: `raw_message.attachments` with a `content_type` starting with `voice` (or an audio filename) | Only the message itself counts; quoted audio does not |
 | C temp audio suffix | `event._temporary_local_files` | Fallback populated by preprocessing (images are tracked too, hence the suffix filter) |
 
 The logic lives in [`detection.py`](detection.py) as pure functions with no `astrbot` import.
@@ -131,8 +131,9 @@ The logic lives in [`detection.py`](detection.py) as pure functions with no `ast
 
 1. Depends on `_temporary_local_files` (AstrBot >= 4.27.3). When the attribute is missing the plugin logs a
    single warning instead of failing silently.
-2. On platforms **without raw segments** (non-OneBot), with STT enabled, a *text* message that quotes a
-   *voice* message is reported as voice — the quoted audio really is in the temp list.
+2. On platforms whose raw message shape is unknown (**neither** OneBot v11 nor QQ official), with STT enabled, a
+   *text* message that quotes a *voice* message is reported as voice — the quoted audio really is in the temp list.
+   Add a branch to `raw_voice_signal()` in `detection.py` to make that platform precise.
 3. Only affects the LLM request and pre-send hooks; nothing about the message content changes.
 4. The plugin produces no audio. Whether a voice reply is actually sent depends on your TTS setup.
 

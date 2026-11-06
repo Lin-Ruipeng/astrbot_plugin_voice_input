@@ -11,6 +11,7 @@ from detection import (
     detect_voice_input,
     is_audio_path,
     raw_has_record,
+    raw_voice_signal,
 )
 
 
@@ -109,6 +110,60 @@ def test_raw_message_bare_segment_list() -> None:
 
 def test_raw_message_non_message_post_type_is_ignored() -> None:
     assert not raw_has_record(RawEvent([Segment("record")], post_type="notice"))
+
+
+# ------------------------------------------------- 信号 B：QQ 官方（botpy）
+
+
+class QQMessage:
+    """假的 botpy 消息对象（只有 attachments 与可选的 msg_elements）。"""
+
+    def __init__(self, attachments: object, msg_elements: object = None) -> None:
+        if attachments is not None:
+            self.attachments = attachments
+        if msg_elements is not None:
+            self.msg_elements = msg_elements
+
+
+class QQAttachment:
+    def __init__(self, content_type: str = "", filename: str = "") -> None:
+        self.content_type = content_type
+        self.filename = filename
+
+
+def test_qq_voice_attachment_is_voice() -> None:
+    assert raw_has_record(QQMessage([{"content_type": "voice", "url": "https://x"}]))
+    assert raw_has_record(QQMessage([QQAttachment("voice", "a.silk")]))
+
+
+def test_qq_audio_by_filename_is_voice() -> None:
+    assert raw_has_record(QQMessage([{"content_type": "file", "filename": "v.mp3"}]))
+
+
+def test_qq_text_message_is_not_voice() -> None:
+    assert not raw_has_record(QQMessage([]))
+    assert not raw_has_record(QQMessage([{"content_type": "image"}]))
+
+
+def test_qq_quoted_voice_is_ignored() -> None:
+    """被引用的语音在 msg_elements 里，不属于本条消息（实测 bug 的回归测试）。"""
+
+    raw = QQMessage(
+        attachments=[],
+        msg_elements=[{"content": "", "attachments": [{"content_type": "voice"}]}],
+    )
+    assert raw_voice_signal(raw) is False
+    assert not detect_voice_input(
+        has_record=False,
+        local_files=["/AstrBot/data/temp/media_audio_1.wav"],
+        raw_message=raw,
+    )
+
+
+def test_qq_missing_attachments_is_unknown() -> None:
+    assert raw_voice_signal(QQMessage(None)) is None
+    assert raw_voice_signal({"attachments": None}) is None
+    assert raw_voice_signal({"foo": 1}) is None
 
 
 # ------------------------------------------------------------------ 合并判定
