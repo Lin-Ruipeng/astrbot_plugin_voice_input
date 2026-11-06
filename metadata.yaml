@@ -1,14 +1,15 @@
 name: astrbot_plugin_voice_input
 display_name: 语音输入识别
-short_desc: 识别消息是否来自语音输入，把结果交给其它插件
+short_desc: 识别消息是否来自语音输入，可把语音消息的回复换成语音
 desc: |
   在 LLM 请求前判断本轮用户消息是否来自语音，并把结论写入
-  `event.set_extra("voice_input", True/False)`，由其它插件自行决定怎么处理。
+  `event.set_extra("voice_input", True/False)`。
 
-  它只负责识别输入模态，不改变任何回复行为。想实现"发语音就回语音"，
-  可以照抄仓库 `examples/` 里的两个可直接运行的示例：
-  一个用 AstrBot 自带 TTS，一个用音色克隆插件。
-version: 1.0.1
+  默认只识别输入模态、不改变任何回复行为。打开 `voice_reply_probability` 后，
+  语音消息的回复会在投递前被换成语音（1.0 = 每条语音消息都回语音，0.0 = 关闭），
+  没有框架 TTS 时可复用 astrbot_plugin_clonetts 的音色配置。
+  目前只在 qq_official 平台实测通过。
+version: 2.0.0
 author: Lin-Ruipeng
 repo: https://github.com/Lin-Ruipeng/astrbot_plugin_voice_input
 astrbot_version: ">=4.27.3,<5"

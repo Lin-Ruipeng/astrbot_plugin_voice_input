@@ -12,6 +12,8 @@ import yaml
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
+from reply_policy import DEFAULT_MAX_CHARS
+
 ROOT = Path(__file__).resolve().parent.parent
 REQUIRED_FIELDS = ("name", "desc", "version", "author")
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
@@ -61,21 +63,46 @@ def test_astrbot_version_range_is_pep440(metadata: dict[str, Any]) -> None:
 
 def test_conf_schema_is_minimal_and_typed() -> None:
     schema = json.loads((ROOT / "_conf_schema.json").read_text(encoding="utf-8"))
-    assert set(schema) == {"inject_prompt", "prompt_text", "verbose_log"}
+    assert set(schema) == {
+        "voice_reply_probability",
+        "voice_reply_max_chars",
+        "verbose_log",
+    }
     for key, item in schema.items():
         assert item.get("type"), f"{key} 必须声明 type"
         assert "default" in item, f"{key} 必须有默认值"
-    assert schema["inject_prompt"]["default"] is False
+        assert item.get("description"), f"{key} 必须有 description（WebUI 可见）"
+    assert schema["voice_reply_probability"]["type"] == "float"
+    assert schema["voice_reply_probability"]["default"] == 0.0
+    assert schema["voice_reply_max_chars"]["type"] == "int"
+    assert schema["voice_reply_max_chars"]["default"] == DEFAULT_MAX_CHARS
 
 
-def test_default_prompt_is_not_vendor_specific() -> None:
-    """默认文案不能点名某个 TTS 插件的工具名（发布前的 review 结论）。"""
+def test_legacy_inject_prompt_is_gone() -> None:
+    """2.0.0 移除了软提示路径，旧配置项不能再出现（README 的迁移表除外）。"""
 
     schema = json.loads((ROOT / "_conf_schema.json").read_text(encoding="utf-8"))
-    assert "clone_tts" not in schema["prompt_text"]["default"]
+    assert "inject_prompt" not in schema
+    assert "prompt_text" not in schema
+
+    main_source = (ROOT / "main.py").read_text(encoding="utf-8")
+    assert "inject_prompt" not in main_source
+    assert "prompt_text" not in main_source
+
+
+def test_main_reads_every_config_key() -> None:
+    schema = json.loads((ROOT / "_conf_schema.json").read_text(encoding="utf-8"))
+    main_source = (ROOT / "main.py").read_text(encoding="utf-8")
+    for key in schema:
+        assert key in main_source, f"配置项 {key} 没有被 main.py 读取"
+
+
+def test_main_does_not_name_other_plugins_tools() -> None:
+    """默认能力不能依赖某个 TTS 插件的工具名（发布前的 review 结论）。"""
 
     main_source = (ROOT / "main.py").read_text(encoding="utf-8")
     assert "clone_tts" not in main_source
+    assert "CloneTTSTool" not in main_source
 
 
 def test_main_does_not_use_deprecated_register() -> None:

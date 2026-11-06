@@ -1,20 +1,20 @@
 {
-    "inject_prompt": {
-        "type": "bool",
-        "description": "检测到语音输入时，向系统提示词追加一条语音回复指令",
-        "hint": "这是可选策略，默认关闭。插件本身只负责识别输入模态，回不回语音由你决定；示例见仓库 examples/ 目录。",
+    "voice_reply_probability": {
+        "type": "float",
+        "description": "语音输入回语音的概率：0.0 = 关闭（默认），1.0 = 每条语音消息都回语音，0.5 = 一半",
+        "hint": "只对用户发语音的消息生效，文字消息永远不转。装了 astrbot_plugin_clonetts 时本插件会独占语音消息，详见 README。",
         "obvious_hint": true,
-        "default": false
+        "default": 0.0
     },
-    "prompt_text": {
-        "type": "text",
-        "description": "开启 inject_prompt 后追加到系统提示词的内容",
-        "hint": "除非你确认所有使用者都装了同一个 TTS 插件，否则不要在文案里写死它的工具名。",
-        "default": "【语音输入】用户这条消息是语音发来的，请用语音回复。如果当前没有可用的语音合成能力，就用文字回复并说明原因。"
+    "voice_reply_max_chars": {
+        "type": "int",
+        "description": "回复文本超过多少个字符就不转语音（0 = 不限制）",
+        "hint": "默认 300。语音回复太长时 TTS 又慢又贵，所以给了上限；想不限制就填 0，想更省钱就填小一点。改完保存并重载插件即可生效。",
+        "default": 300
     },
     "verbose_log": {
         "type": "bool",
-        "description": "把判定细节（各个信号）输出到 debug 日志",
+        "description": "把判定细节（各个信号、抽签结果）输出到 debug 日志",
         "hint": "需要把日志级别调到 DEBUG 才能看到；生产环境建议保持关闭。",
         "default": false
     }

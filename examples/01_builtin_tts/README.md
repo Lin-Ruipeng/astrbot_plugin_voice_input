@@ -3,6 +3,12 @@
 > 这是 [`astrbot_plugin_voice_input`](../../) 的示例，**不发布到插件市场**。
 > 用法：把本目录拷到 `data/plugins/` 下，并把目录名改成 `astrbot_plugin_voice_input_demo_tts`（与 `metadata.yaml` 的 `name` 一致），然后在 WebUI 启用。
 
+> **2.0.0 起主插件已内置同款能力**：把插件配置里的 `voice_reply_probability` 设成 `1.0`，
+> 语音消息的回复就会在投递前被换成语音，不需要这个示例。本示例保留下来是为了演示
+> **自己写回复策略**：读 `voice_input`、自己调 TTS provider、自己处理合成失败后的回退。
+> 两者的区别：主插件还会检测 `astrbot_plugin_clonetts` 并独占语音消息（避免同一句话被合成两次），
+> 本示例只做最单纯的转换。
+
 ## 效果
 
 | 你发的内容 | 机器人回的内容 |
@@ -70,6 +76,8 @@ event.get_result().chain = [Record.fromFileSystem(audio_path)]
 
 - **不要同时打开全局 TTS**（`provider_tts_settings.enable`）：全局转换会把所有回复都变语音，
   再叠加本示例会发两遍。示例代码里已经检测"链里是否已有 `Record`"并跳过，但两个都开属于重复配置。
+- 如果主插件也打开了 `voice_reply_probability`，主插件（priority=100）会先把回复换成语音，
+  本示例（priority=90）看到链里已有 `Record` 就跳过 —— 不会双发，但此时真正生效的是主插件的配置。
 - 本示例会把回复链缩成一条语音，链里的图片 / @ 之类会被丢掉 —— 示例图省事，正式插件请自己取舍。
 - 会话级关掉了 TTS（自定义规则里的「启用 TTS」）不影响本示例，因为本示例直接调 provider。
 

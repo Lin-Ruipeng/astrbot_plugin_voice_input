@@ -3,6 +3,12 @@
 > 这是 [`astrbot_plugin_voice_input`](../../) 的示例，**不发布到插件市场**。
 > 用法：把本目录拷到 `data/plugins/` 下，并把目录名改成 `astrbot_plugin_voice_input_demo_clone_tts`（与 `metadata.yaml` 的 `name` 一致），然后在 WebUI 启用。
 
+> **2.0.0 起建议直接用主插件的 `voice_reply_probability`**：本示例靠提示词让模型自己调
+> `clone_tts`，实测遵循率不稳定（模型可能不调、调了失败、长上下文下照做率下降）。
+> 主插件是确定性转换：回复已生成、尚未投递时直接换成语音，见
+> [`reply_policy.py`](../../reply_policy.py) 与 [ADR 0002](../../docs/adr/0002-forced-voice-reply-hook.md)。
+> 本示例保留下来作为对照，也方便你想继续走"模型自己决定"路线时参考。
+
 ## 效果
 
 | 你发的内容 | 机器人回的内容 |
@@ -54,7 +60,11 @@ WebUI 首页把 Agent / 沙箱权限打开后，直接把这段发给机器人�
 
 ## 注意
 
-- 如果同时还装了会"自动把回复转语音"的插件（或打开了全局 TTS），可能一次收到两条语音。
+- **不要同时开主插件的 `voice_reply_probability` 和本示例**：本示例会让模型调 `clone_tts` 工具，
+  工具自己就发了一条语音；主插件随后又会把文字回复转成语音，可能收到两条。
+- 克隆插件自己也有 `tts_probability`（默认 80），它会在 `on_decorating_result` 里把回复再转一次。
+  只开主插件的 `voice_reply_probability` 时，主插件会独占语音消息、而且主插件的
+  `Record.text` 是空串，克隆插件会自己跳过，所以一句话只合成一次（实测于 v3.0.4）。
 - 文案里写死了 `clone_tts` 这个工具名。换用别的 TTS 插件（Minimax、IndexTTS、voice_hub……）时，
   把工具名改成它提供的那一个，否则模型会一直调用一个不存在的工具。
 - 检测本身由主插件负责；本示例不发音频、不拦截消息，只改系统提示词。
