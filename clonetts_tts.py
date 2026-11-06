@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import json
 import tempfile
+import traceback
 import uuid
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -186,6 +187,7 @@ async def synthesize(
     *,
     temp_dir: str | Path,
     timeout: float = 30.0,
+    verbose: bool = False,
 ) -> tuple[str | None, str | None]:
     """调用火山 v3 合成语音并落盘。
 
@@ -194,6 +196,7 @@ async def synthesize(
         conf: clonetts 的配置字典。
         temp_dir: 临时音频目录。
         timeout: 整个请求的超时秒数。
+        verbose: 失败时是否把 traceback 一并带回（由 ``verbose_log`` 控制）。
 
     Returns:
         ``(音频路径, 错误信息)``；成功时错误信息为 ``None``，失败时路径为 ``None``。
@@ -219,9 +222,15 @@ async def synthesize(
         ):
             if response.status != 200:
                 return None, f"火山接口返回 HTTP {response.status}"
-            audio = parse_stream(await response.read().splitlines())
+            # 注意括号：``await response.read().splitlines()`` 会先取
+            # ``.splitlines()`` 再 await，协程没有这个方法，合成永远失败。
+            body = await response.read()
+            audio = parse_stream(body.splitlines())
     except Exception as exc:  # noqa: BLE001 - 回退失败一律保留文字
-        return None, f"火山回退请求失败：{exc}"
+        detail = f"{type(exc).__name__}: {exc}"
+        if verbose:
+            detail = f"{detail}\n{traceback.format_exc()}"
+        return None, f"火山回退请求失败：{detail}"
 
     if not audio:
         return None, "火山接口没有返回音频数据"

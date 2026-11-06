@@ -320,6 +320,7 @@ class VoiceInputPlugin(Star):
             text,
             conf,
             temp_dir=get_astrbot_temp_path(),
+            verbose=self._verbose_log,
         )
         if error or not audio_path:
             self.logger.warning("[voice_reply] 火山回退失败：%s", error or "未知原因")

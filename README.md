@@ -202,32 +202,43 @@ class MyVoicePolicy(Star):
 判定逻辑本身在 [`detection.py`](detection.py)，是不导入 `astrbot` 的纯函数；
 回复策略的抽签与跳过规则在 [`reply_policy.py`](reply_policy.py)，同样可脱机单测。
 
-## 已知问题与限制
+## 真机验证结论（2026-11-06，qq_official）
 
-**已知问题（暂未修复）：`qq_official` 下「文字引用语音」仍可能被误判为语音输入。**
+测试环境同上表；容器里**没有配置框架 TTS 提供商**，语音走 clonetts 的火山回退。
 
-用文字消息引用一条语音时，这条消息本身是文字，但被引用的语音也会被预处理转成 wav 并登记到事件上。
-2.0.0 的检测层会优先读 QQ 官方消息的**顶层** `attachments`（被引用的语音在 `msg_elements` 里，
-不计入），但实测中这个信号并不总能拿到，仍会回落到临时音频文件判定。**目前没有可靠修复**
-（issue #1），先记录为已知问题。后果：如果你打开了 `voice_reply_probability`，这条文字消息可能被回一句语音。
+| 场景 | 结果 |
+| --- | --- |
+| 发送语音（`voice_reply_probability: 1.0`） | ✅ 收到一条语音 |
+| 发送纯文字 | ✅ 文字回复，不转语音 |
+| 文字消息**引用**一条语音 | ✅ 判为文字输入（`raw_signal=False`，临时文件里虽有被引用的音频） |
+| 与 `astrbot_plugin_clonetts` v3.0.4 同开 | ✅ 日志显示已独占，未出现重复合成 |
 
-其它限制：
+这次实测修掉了一个 `await` 优先级 bug：`await response.read().splitlines()` 等价于
+`await (response.read().splitlines())`，会先取 `.splitlines()` 再 await，导致火山回退
+**必然失败**并静默退回文字。已修复（先 `await` 再 `splitlines()`），并补了 mock 流的回归测试。
 
-1. 判定依赖 AstrBot 的 `_temporary_local_files`（>= 4.27.3）。属性缺失时插件会打一条 warning 而不是静默失效。
-2. 平台上只有 `qq_official` 实测通过；`aiocqhttp` 代码保留但未实测，其它平台更未测试。
-3. **流式输出下不会转换语音**（AstrBot 内置 TTS 同样跳过流式）；需要强制语音回复请先关闭流式输出。
-4. 命令 / `yield` 类结果与带图片等非纯文本的消息链保持文字，不会转换。
-5. 为了让概率型 TTS 插件干净跳过，`Record.text` 写成空串。某些平台在语音发送失败时会拿它做文字回退，
+## 已知限制
+
+1. 平台上只有 `qq_official` 实测通过；`aiocqhttp` 代码保留但未实测，其它平台更未测试。
+2. 判定依赖 AstrBot 的 `_temporary_local_files`（>= 4.27.3）。属性缺失时插件会打一条 warning 而不是静默失效。
+3. 检测优先读平台原始消息的**顶层**内容，被引用的语音不计入（1.0.x 的「文字引用语音被误判」已在 2.0.0 修复并实测）。
+   但若某个平台/场景拿不到原始消息，仍会退化为临时音频文件判定，此时引用语音可能被算进来。
+4. **流式输出下不会转换语音**（AstrBot 内置 TTS 同样跳过流式）；需要强制语音回复请先关闭流式输出。
+5. 命令 / `yield` 类结果与带图片等非纯文本的消息链保持文字，不会转换。
+6. 为了让概率型 TTS 插件干净跳过，`Record.text` 写成空串。某些平台在语音发送失败时会拿它做文字回退，
    这时回退文案为空。
-6. 回退到火山 v3 需要 `astrbot_plugin_clonetts` 的配置里有 `api_key` / `voice_type`；
+7. 回退到火山 v3 需要 `astrbot_plugin_clonetts` 的配置里有 `api_key` / `voice_type`；
    都没有时只回文字并打一条 warning。
-7. 插件本身不产生音频。能不能真的发出语音，取决于框架 TTS 提供商或 clonetts 的火山配置。
+8. 插件本身不产生音频。能不能真的发出语音，取决于框架 TTS 提供商或 clonetts 的火山配置。
 
 ## 排错
 
 - 日志一直没有 `[voice_input]` 行 → 确认 AstrBot 版本 >= 4.27.3、插件已启用。
 - 判定永远为 `False` → 打开 `verbose_log`，看是哪个信号没命中；若三个信号都空，多半是平台在预处理前就没把语音交给 AstrBot。
 - 发语音却回文字 → 看 `[voice_reply]` 日志：`概率 0`？抽签没中？文本超长？没有可用 TTS？流式输出？
+- `火山回退失败：'coroutine' object has no attribute 'splitlines'` → 这是修复前的 2.0.0 构建，
+  拉最新代码即可（已修复并补了回归测试）。
+- 想看到失败堆栈 → 打开 `verbose_log`，火山回退的错误信息里会附 traceback。
 - 收到两条语音 / 被合成两次 → 确认 `astrbot_plugin_clonetts` 版本是 v3.0.4，且本插件 priority 仍是 100。
 - 想精确控制比例 → 装了 clonetts 时 `voice_reply_probability` 的中间值也能精确生效（未抽中的会被独占降级），
   此时文字消息仍按 clonetts 的概率出语音。

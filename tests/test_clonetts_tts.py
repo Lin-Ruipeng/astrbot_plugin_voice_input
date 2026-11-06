@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -176,3 +178,126 @@ def test_synthesize_reports_missing_credentials(tmp_path: Path) -> None:
     path, error = asyncio.run(synthesize("hi", {}, temp_dir=tmp_path))
     assert path is None
     assert error is not None and "api_key" in error
+
+
+# ------------------------------------------------------- 合成入口（mock aiohttp）
+
+
+class FakeResponse:
+    def __init__(self, body: bytes, status: int = 200) -> None:
+        self._body = body
+        self.status = status
+
+    async def read(self) -> bytes:
+        # 关键：必须返回协程。``await response.read().splitlines()`` 这种写法
+        # 会先取 .splitlines() 再 await，在这里会直接炸出 AttributeError。
+        return self._body
+
+    async def __aenter__(self) -> FakeResponse:
+        return self
+
+    async def __aexit__(self, *args: object) -> bool:
+        return False
+
+
+def install_fake_aiohttp(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    body: bytes = b"",
+    status: int = 200,
+    error: Exception | None = None,
+) -> None:
+    """把 aiohttp 换成最小可用替身，避免测试依赖网络。"""
+
+    module = types.ModuleType("aiohttp")
+
+    class ClientTimeout:
+        def __init__(self, total: float | None = None) -> None:
+            self.total = total
+
+    class ClientSession:
+        def __init__(self, timeout: ClientTimeout | None = None) -> None:
+            self.timeout = timeout
+
+        async def __aenter__(self) -> ClientSession:
+            return self
+
+        async def __aexit__(self, *args: object) -> bool:
+            return False
+
+        def post(self, url: str, headers=None, json=None) -> FakeResponse:
+            if error is not None:
+                raise error
+            return FakeResponse(body, status)
+
+    module.ClientTimeout = ClientTimeout  # type: ignore[attr-defined]
+    module.ClientSession = ClientSession  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "aiohttp", module)
+
+
+def stream_body(*chunks: bytes) -> bytes:
+    lines = [chunk(part) for part in chunks] + [json.dumps({"code": DONE_CODE})]
+    return ("\n".join(lines) + "\n").encode()
+
+
+def test_synthesize_reads_stream_and_writes_audio(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """回归：``await response.read().splitlines()`` 会让合成永远失败。"""
+
+    install_fake_aiohttp(monkeypatch, body=stream_body(b"abc", b"def"))
+
+    path, error = asyncio.run(synthesize("你好", CONF, temp_dir=tmp_path))
+
+    assert error is None
+    assert path is not None
+    assert Path(path).read_bytes() == b"abcdef"
+    assert Path(path).suffix == ".mp3"
+
+
+def test_synthesize_reports_http_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    install_fake_aiohttp(monkeypatch, status=502)
+
+    path, error = asyncio.run(synthesize("你好", CONF, temp_dir=tmp_path))
+
+    assert path is None
+    assert error is not None and "HTTP 502" in error
+
+
+def test_synthesize_reports_empty_audio(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    install_fake_aiohttp(monkeypatch, body=b"")
+
+    path, error = asyncio.run(synthesize("你好", CONF, temp_dir=tmp_path))
+
+    assert path is None
+    assert error is not None and "没有返回音频" in error
+
+
+def test_synthesize_error_has_no_traceback_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    install_fake_aiohttp(monkeypatch, error=RuntimeError("boom"))
+
+    path, error = asyncio.run(synthesize("你好", CONF, temp_dir=tmp_path))
+
+    assert path is None
+    assert error is not None
+    assert "RuntimeError: boom" in error
+    assert "Traceback" not in error
+
+
+def test_synthesize_verbose_includes_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    install_fake_aiohttp(monkeypatch, error=RuntimeError("boom"))
+
+    path, error = asyncio.run(synthesize("你好", CONF, temp_dir=tmp_path, verbose=True))
+
+    assert path is None
+    assert error is not None
+    assert "Traceback" in error
+    assert "RuntimeError: boom" in error

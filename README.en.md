@@ -208,31 +208,39 @@ Three signals; any hit means voice. When the platform's raw message segments are
 Detection lives in [`detection.py`](detection.py) as pure functions with no `astrbot` import. The reply policy's
 roll and skip rules live in [`reply_policy.py`](reply_policy.py), also testable offline.
 
-## Known issue and limitations
+## Verified on a real bot (2026-11-06, qq_official)
 
-**Known issue (not fixed yet): on `qq_official`, a *text* message that quotes a *voice* message can still be
-detected as voice input.**
+Same environment as above; the container had **no framework TTS provider**, so audio came from clonetts' Volcano fallback.
 
-The message itself is text, but the quoted audio is also transcoded and tracked on the event. 2.0.0 prefers the
-QQ official message's **top-level** `attachments` (quoted audio lives in `msg_elements` and is not counted), but
-in practice that signal is not always available, so detection falls back to the temp-audio signal. There is no
-reliable fix yet (issue #1), so it is documented as a known issue. Consequence: with
-`voice_reply_probability` enabled, that text message may get a voice reply.
+| Scenario | Result |
+| --- | --- |
+| Send a voice message (`voice_reply_probability: 1.0`) | ✅ One voice message received |
+| Send plain text | ✅ Text reply, no conversion |
+| A text message **quoting** a voice message | ✅ Detected as text (`raw_signal=False`, even though the quoted audio is in the temp list) |
+| Running alongside `astrbot_plugin_clonetts` v3.0.4 | ✅ Logs show the exclusive claim; no double synthesis |
 
-Other limitations:
+This run also uncovered an `await` precedence bug: `await response.read().splitlines()` is
+`await (response.read().splitlines())`, so `.splitlines()` ran on a coroutine and the Volcano fallback
+**always failed**, silently falling back to text. Fixed (await first, then `splitlines()`) and covered by a
+mock-stream regression test.
 
-1. Depends on `_temporary_local_files` (AstrBot >= 4.27.3). When missing, the plugin logs a single warning
-   instead of failing silently.
-2. Only `qq_official` is verified; `aiocqhttp` keeps its code path but is untested, and other platforms are
+## Known limitations
+
+1. Only `qq_official` is verified; `aiocqhttp` keeps its code path but is untested, and other platforms are
    untested too.
-3. **Streaming output is never converted** (AstrBot's built-in TTS skips streaming as well). Disable streaming
+2. Depends on `_temporary_local_files` (AstrBot >= 4.27.3). When missing, the plugin logs a single warning
+   instead of failing silently.
+3. Detection prefers the platform's **top-level** raw message, so quoted audio is not counted (the 1.0.x
+   "text quoting voice" false positive is fixed in 2.0.0 and verified). If a platform/scenario cannot provide
+   the raw message, detection falls back to the temp-audio signal and quoted audio may be counted again.
+4. **Streaming output is never converted** (AstrBot's built-in TTS skips streaming as well). Disable streaming
    if you need guaranteed voice replies.
-4. Command / `yield` results and chains containing images or other non-text components stay text.
-5. `Record.text` is deliberately empty so probability-based TTS plugins skip cleanly. On platforms that use it
+5. Command / `yield` results and chains containing images or other non-text components stay text.
+6. `Record.text` is deliberately empty so probability-based TTS plugins skip cleanly. On platforms that use it
    as a text fallback when audio delivery fails, that fallback will be empty.
-6. The Volcano fallback needs `api_key` / `voice_type` in clonetts' config; otherwise the plugin logs a warning
+7. The Volcano fallback needs `api_key` / `voice_type` in clonetts' config; otherwise the plugin logs a warning
    and keeps text.
-7. The plugin produces no audio itself. Whether voice is actually sent depends on your framework TTS provider
+8. The plugin produces no audio itself. Whether voice is actually sent depends on your framework TTS provider
    or clonetts' Volcano config.
 
 ## Troubleshooting
@@ -242,6 +250,9 @@ Other limitations:
   never handed the audio to AstrBot.
 - Voice in but text out → read the `[voice_reply]` lines: probability `0`? roll missed? text too long? no TTS
   available? streaming enabled?
+- `火山回退失败：'coroutine' object has no attribute 'splitlines'` → that is a 2.0.0 build from before the
+  fix; pull the latest code (fixed, with a regression test).
+- Want the failure stack trace → enable `verbose_log`; Volcano fallback errors then include a traceback.
 - Two voice messages / synthesized twice → confirm `astrbot_plugin_clonetts` is v3.0.4 and this plugin still
   runs at priority 100.
 - Need exact ratios → with clonetts installed, intermediate probabilities still hold (misses are claimed and
