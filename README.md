@@ -1,67 +1,151 @@
-# 语音输入门控（astrbot_plugin_voice_gate）
+<div align="center">
 
-判断用户这条消息是不是语音发来的。如果是，就往系统提示词里追加一条指令，
-让 AI 用语音回复。
+<img src="logo.png" alt="astrbot_plugin_voice_input" width="128" height="128" />
 
-## 为什么需要它
+# 语音输入识别（astrbot_plugin_voice_input）
 
-AstrBot 的预处理阶段会先做语音转文字（STT），然后把消息链里的 `Record`
-组件**原地替换**成 `Plain`。
+**只判断"这条消息是不是语音发来的"，把结论交给别人。**
 
-等插件拿到消息时，语音痕迹已经没了，`isinstance(comp, Record)` 永远是
-`False`。所以 AI 无法判断"用户刚才是发语音还是打字"。
+[![简体中文](https://img.shields.io/badge/文档-简体中文-blue)](README.md)
+[![English](https://img.shields.io/badge/docs-English-blue)](README.en.md)
+[![AstrBot](https://img.shields.io/badge/AstrBot-%3E%3D4.27.3-blue)](https://astrbot.app)
+[![version](https://img.shields.io/badge/version-1.0.0-blue)](metadata.yaml)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-结果就是：你发语音，它可能只回文字。
+**简体中文** ｜ [English](README.en.md)
 
-## 原理
+</div>
 
-预处理阶段在转文字之前，会先把语音转成 wav，并把文件登记到事件对象的
-临时媒体列表上，用于事后清理。
+---
 
-本插件在 `on_llm_request` 钩子里检查这个列表：
+## 它做什么
 
-- 列表里出现 `.wav` / `.mp3` / `.amr` 等音频后缀 → 判定为语音输入
-- 命中后，把一条指令追加到 `req.system_prompt`
-- AI 看到指令后，按人格设定用语音回复
+AstrBot 在预处理阶段就会做语音转文字（STT），并把消息链里的 `Record` 组件**原地替换**成 `Plain`。
+等插件拿到消息时，语音痕迹已经没了 —— 于是"用户刚才是发语音还是打字"这个信息就丢了。
 
-同时兼容两种兜底：
+本插件把这条信息捡回来，写进事件：
 
-- 消息链里若仍存在 `Record` 组件（某些时序下）
-- 其他插件写入的 `is_voice_input` 标记
+```python
+event.get_extra("voice_input")  # True = 语音，False = 文字
+```
+
+## 它不做什么
+
+| | |
+| --- | --- |
+| ❌ 不决定"要不要用语音回复" | 那是**你的回复策略**。想实现可以照抄 [`examples/`](examples/) |
+| ❌ 不改消息内容、不拦截消息、不改变发送行为 | 只读信号 + 写一个 `extra` |
+| ❌ 不内置 TTS | 用 AstrBot 自带 TTS 还是第三方插件，由你决定 |
+
+**默认安装后行为完全不变**，只有别的插件（或你打开 `inject_prompt`）才会用到这个标志。
 
 ## 安装
 
-把本目录放到 AstrBot 的插件目录：
+**插件市场**：在 AstrBot 管理面板 →「插件」→「插件市场」搜索「语音输入识别」。
 
-```
-/AstrBot/data/plugins/astrbot_plugin_voice_gate/
-```
+**手动**：把本目录放到 `data/plugins/astrbot_plugin_voice_input/`，重启或在 WebUI 重载插件。
 
-重启 AstrBot，或在 WebUI 插件页重载。
+**压缩包**：WebUI「插件」页上传 zip（压缩包内只需一层 `astrbot_plugin_voice_input/` 目录）。
 
-## 配置
+## 兼容性
 
 | 项 | 说明 |
 | --- | --- |
-| `enable` | 总开关 |
-| `prompt_text` | 命中语音时追加到系统提示词的内容，可自定义 |
-| `debug_log` | 把命中记录写到 `/tmp/voice_gate.log` |
+| AstrBot | **>= 4.27.3**（判定依赖该版本引入的 `_temporary_local_files`；更早版本只能在 STT 关闭时识别） |
+| 平台 | `aiocqhttp`（OneBot v11 / NapCat / LLOneBot 等）实测最准；其它平台退化为"临时音频文件后缀"判定，未经测试 |
+| STT | **不需要开启**。检测独立于 STT；但 AI 要读懂语音内容仍需 STT |
+
+## 快速验证
+
+装好后发一条语音、再发一条文字，日志里会各出现一行：
+
+```
+[voice_input] 本轮消息判定为语音输入
+[voice_input] 本轮消息判定为文字输入
+```
+
+想看到三个信号的具体取值，把插件配置里的 `verbose_log` 打开，并把日志级别调到 `DEBUG`。
+
+## 在别的插件里怎么用
+
+`voice_input` 是普通的 `extra`，任何 `event` 都能读。**读取方的 `priority` 要比 100 小**（AstrBot 里数值大的 handler 先执行，本插件是 100）。
+
+```python
+from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.provider import ProviderRequest
+from astrbot.api.star import Context, Star
+
+
+class MyVoicePolicy(Star):
+    def __init__(self, context: Context, config: dict | None = None) -> None:
+        super().__init__(context)
+        self.config = config or {}
+
+    @filter.on_llm_request(priority=50)  # < 100：确保 voice_input 已经写好
+    async def on_llm_request(
+        self, event: AstrMessageEvent, req: ProviderRequest
+    ) -> None:
+        if not event.get_extra("voice_input"):
+            return
+        req.system_prompt += "用户这条消息是语音发来的，请用语音回复。"
+```
+
+命令类插件（不走 LLM）在 `on_decorating_result` 里同样能读到这个标志 —— 本插件在两个钩子里都会写。
+
+两个**完整可跑**的示例见 [`examples/`](examples/)：
+
+| 示例 | 效果 | 前置 |
+| --- | --- | --- |
+| [`01_builtin_tts`](examples/01_builtin_tts/) | 发语音 → 用 **AstrBot 自带 TTS** 回语音说"我看得出你这条是语音"；发文字 → 回文字 | 配一个 TTS 提供商（推荐小米 MiMo，有免费额度） |
+| [`02_clone_tts_prompt`](examples/02_clone_tts_prompt/) | 发语音 → 用**克隆音色**回语音 | 安装音色克隆插件 `astrbot_plugin_clonetts` |
+
+## 配置
+
+| 项 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `inject_prompt` | bool | `false` | 检测到语音时，往系统提示词追加 `prompt_text`。**这是可选策略，不是插件的本职** |
+| `prompt_text` | text | 见下 | 仅在 `inject_prompt` 打开时生效。默认文案不点名任何 TTS 插件 |
+| `verbose_log` | bool | `false` | 把 has_record / 临时文件 / raw 三个信号打到 debug 日志 |
+
+默认文案：
+
+> 【语音输入】用户这条消息是语音发来的，请用语音回复。如果当前没有可用的语音合成能力，就用文字回复并说明原因。
+
+## 原理
+
+三条信号，任一命中即为语音；能拿到平台原始消息段时以它为准：
+
+| 信号 | 来源 | 说明 |
+| --- | --- | --- |
+| A 残留 `Record` | `event.get_messages()` | STT 关闭或失败时才成立 |
+| B 原始消息段 | `event.message_obj.raw_message.message` 含 `type == "record"` | OneBot v11 最准，只反映"用户本条消息" |
+| C 临时音频后缀 | `event._temporary_local_files` | 预处理的兜底依据（图片也会登记，故按后缀过滤） |
+
+判定逻辑本身在 [`detection.py`](detection.py)，是不导入 `astrbot` 的纯函数。
 
 ## 已知限制
 
-1. 依赖 `on_llm_request` 钩子，只能影响走 LLM 的回复，插件指令类回复管不到。
-2. 判定依据是临时媒体文件后缀。如果上游改了预处理行为，这个依据可能失效。
-3. 只能告诉 AI "用语音回"，真正能不能发出语音，还得看 TTS 插件是否正常。
-4. 图片消息同样会被登记为临时媒体，所以这里只认音频后缀。
+1. 判定依赖 AstrBot 的 `_temporary_local_files`（>= 4.27.3）。属性缺失时插件会打一条 warning 而不是静默失效。
+2. 在**拿不到原始消息段**的平台（非 OneBot）上，若 STT 开启，一条"文字消息引用了一条语音"会被判为语音输入 —— 因为临时文件里确实有那条语音的音频。
+3. 只影响 LLM 请求与发送前钩子，不影响消息内容本身，也不保证在流式输出下时序正确。
+4. 插件不产生音频。能不能真的发出语音，取决于你配置的 TTS 能力。
 
-## 排查
+## 排错
+
+- 日志一直没有 `[voice_input]` 行 → 确认 AstrBot 版本 >= 4.27.3、插件已启用。
+- 判定永远为 `False` → 打开 `verbose_log`，看是哪个信号没命中；若三个信号都空，多半是平台在预处理前就没把语音交给 AstrBot。
+- 发语音却回文字 → 检查 `inject_prompt` 是否打开、以及 TTS 插件/提供商是否可用（见示例 README）。
+
+## 开发
 
 ```bash
-tail -f /tmp/voice_gate.log
+pip install pytest pyyaml packaging ruff
+ruff check . && ruff format --check .
+pytest
 ```
 
-有 `detected voice input` 说明判定成功。
+测试覆盖纯函数判定与发布元数据一致性（版本号语义化、`repo` 可访问性字段、配置项与代码对齐、不再使用废弃的 `@register`），**不需要安装 AstrBot**。
 
 ## 许可
 
-MIT
+[MIT](LICENSE) © 2026 Lin-Ruipeng

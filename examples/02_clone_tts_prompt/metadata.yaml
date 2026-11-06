@@ -1,0 +1,16 @@
+name: astrbot_plugin_voice_input_demo_clone_tts
+display_name: 语音输入示例·音色克隆
+short_desc: 发语音就调用 clone_tts 工具用克隆音色回语音（voice_input 示例）
+desc: |
+  `astrbot_plugin_voice_input` 的示例插件：读取 `voice_input` 标志，
+  当消息是语音发来时，向系统提示词追加一条指令，要求模型调用 `clone_tts` 工具用语音回复。
+
+  `clone_tts` 工具由第三方插件 `astrbot_plugin_clonetts`（音色克隆）提供。
+version: 1.0.0
+author: Lin-Ruipeng
+repo: https://github.com/Lin-Ruipeng/astrbot_plugin_voice_input
+astrbot_version: ">=4.27.3,<5"
+tags:
+  - 示例
+  - 语音
+  - 音色克隆

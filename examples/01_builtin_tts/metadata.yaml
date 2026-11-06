@@ -1,0 +1,16 @@
+name: astrbot_plugin_voice_input_demo_tts
+display_name: 语音输入示例·内置 TTS
+short_desc: 发语音就用 AstrBot 自带 TTS 回语音（voice_input 示例）
+desc: |
+  `astrbot_plugin_voice_input` 的示例插件：读取 `voice_input` 标志，
+  当消息是语音发来时，用 AstrBot 已配置的 TTS 提供商把回复转成语音发出去。
+
+  它演示的是"回复策略由使用方决定"：检测插件本身不做任何回复决策。
+version: 1.0.0
+author: Lin-Ruipeng
+repo: https://github.com/Lin-Ruipeng/astrbot_plugin_voice_input
+astrbot_version: ">=4.27.3,<5"
+tags:
+  - 示例
+  - 语音
+  - TTS
