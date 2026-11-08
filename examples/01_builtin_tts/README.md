@@ -1,86 +1,84 @@
-# 示例 1：发语音，就用 AstrBot 自带 TTS 回语音
+# 示例 1：配好框架 TTS，做到「语音进 → 语音出」
 
-> 这是 [`astrbot_plugin_voice_input`](../../) 的示例，**不发布到插件市场**。
-> 用法：把本目录拷到 `data/plugins/` 下，并把目录名改成 `astrbot_plugin_voice_input_demo_tts`（与 `metadata.yaml` 的 `name` 一致），然后在 WebUI 启用。
+> **这是一篇教学，不是可安装的插件。** 本目录只有这份 README。
+> 想自己写回复策略（读 `voice_input`、自己调 TTS provider）的完整代码，见
+> [`docs/custom-policy.md`](../../docs/custom-policy.md)。
 
-> **2.0.0 起主插件已内置同款能力**：把插件配置里的 `voice_reply_probability` 设成 `1.0`，
-> 语音消息的回复就会在投递前被换成语音，不需要这个示例。本示例保留下来是为了演示
-> **自己写回复策略**：读 `voice_input`、自己调 TTS provider、自己处理合成失败后的回退。
-> 两者的区别：主插件还会检测 `astrbot_plugin_clonetts` 并独占语音消息（避免同一句话被合成两次），
-> 本示例只做最单纯的转换。
-
-## 效果
+## 目标
 
 | 你发的内容 | 机器人回的内容 |
 | --- | --- |
-| 一条语音 | 一条**语音**：「我看得出你这条是语音发的。」+ 它原本想说的话 |
-| 一条文字 | **文字**：「我看得出你这条是文字发的。」+ 它原本想说的话 |
+| 一条语音 | 一条**语音** |
+| 一条文字 | **文字** |
 
-发不出来语音时（没配 TTS / 合成失败），会自动退回文字，不会卡死。
+默认情况下插件只做检测、不改回复；要让"语音消息回语音"，需要把框架 TTS 配通，
+再打开插件里的 `voice_reply_probability`。
 
-## 它怎么做到的
+## 为什么这样设计
 
-1. 主插件在 `on_llm_request` / `on_decorating_result` 里写 `event.set_extra("voice_input", bool)`；
-2. 本示例在 `on_decorating_result`（priority=90，晚于主插件）里读这个标志；
-3. 是语音 → `context.get_using_tts_provider_async()` 拿到 TTS provider，
-   `provider.get_audio(text)` 合成出一个本地音频文件，把消息链换成一个 `Record`。
+方便发语音的时候，通常也方便听语音 —— 发语音的人大概率愿意收到语音回复。
+所以这件事交给插件判断：**检测到语音输入，就按概率把回复换成语音**，而不是指望模型自己想起来调 TTS 工具。
 
-```python
-provider = await self.context.get_using_tts_provider_async(event.unified_msg_origin)
-audio_path = await provider.get_audio(text)
-event.track_temporary_local_file(audio_path)  # 交给 AstrBot 事后清理
-event.get_result().chain = [Record.fromFileSystem(audio_path)]
-```
+---
 
-> 官方文档里 `on_decorating_result` 就是拿来做"转语音 / 转图片 / 加前缀"的钩子。
+## 怎么配
 
-## 前置：配一个 TTS 提供商
+完整的路线 A / 路线 B 在 [README → 快速上手](../../README.md#快速上手)：
 
-本示例**自己调用** TTS provider，所以不需要打开全局的
-`provider_tts_settings.enable`（那是"所有回复都转语音"，和示例想要的效果不一样）。
+- **路线 A（懒人）**：把 README 里那段提示词直接发给机器人，它会读 [`AGENTS.md`](../../AGENTS.md) 自己配。
+- **路线 B（手动）**：Agent 权限 → STT → TTS → 本插件；前 3 步都有跳过条件。
 
-### 推荐：小米 MiMo TTS（便宜，够用）
+本页只把 TTS 这一段展开——它是“语音出”的关键。
 
-1. 打开 <https://platform.xiaomimimo.com> 注册并完成实名认证；
-2. 在控制台创建 **API Key** 并复制：
-   - `sk-` 开头 = 按量计费（有限时免费额度）
-   - `tp-` 开头 = Token Plan 套餐
-3. AstrBot 管理面板 →「模型提供商」→「文字转语音」→「新增」→ 选 **MiMo TTS API**，填：
+### TTS：先用免费的 Edge TTS
 
-   | 字段 | 值 |
-   | --- | --- |
-   | API Key | 上一步复制的 Key |
-   | API Base | `https://api.xiaomimimo.com/v1`（用 `tp-` Key 时填 `https://token-plan-cn.xiaomimimo.com/v1`） |
-   | 模型 | `mimo-v2.5-tts` |
-   | 音色 | `mimo_default`（想换风格可改 `mimo-tts-voice` / `mimo-tts-style-prompt`） |
+1. 模型提供商 → **文字转语音** → 新增 → **Edge TTS**。
+   - 免费、无需 API Key；默认音色 `zh-CN-XiaoxiaoNeural`。
+   - 缺 `edge-tts` 库时：WebUI「数据与日志 → 日志」右上角 **安装 pip 库** 填 `edge-tts`；
+     或容器里 `pip install edge-tts` 后重启。
+2. 配置文件 → AI → **语音回复**：打开 → **默认文本转语音模型**选 Edge TTS。
+3. 同一页：**TTS 触发概率改成 `0`**，**流式输出关掉**。
+   - 触发概率不设 0，框架 TTS 会把**文字消息**也转成语音。
+   - 流式输出下，框架 TTS 和本插件都不转换。
+4. 插件配置把 `voice_reply_probability` 设为 `1.0`。
 
-4. 「保存并获取模型」→ 点模型右侧测试一下。
+#### 想换更好的音色：阿里云百炼 TTS
 
-其它可选：OpenAI TTS、Fish Audio、MiniMax、火山引擎等，AstrBot 内置适配器都可以用，
-本示例不关心具体是哪家。
+模型提供商 → 文字转语音 → 新增 **阿里云百炼 TTS(API)**，填百炼控制台的 API Key，模型用
+**Cosy 系列**（如 `cosyvoice-v1`，默认音色 `loongstella`）。
 
-### 顺便把 STT 开起来（可选但强烈建议）
+> **Qwen 系列在 AstrBot 上直接跑不通（官方未适配）**，不要选。
 
-检测本身**不依赖** STT，但不开 STT 的话 AI 读不懂你说了什么。
-「模型提供商」→「语音转文字」→ 新增一个（MiMo 的 `mimo-v2.5-asr` 也可以），然后在
-「配置文件 → AI → 语音转文字」里启用。
+### 验证
 
-### 官方文档
+- 发一条**语音** → 收到语音；发一条**文字** → 收到文字。
+- 启动日志里应有一行：
 
-- 配置文件里的 TTS 相关字段（`provider_tts_settings`）：<https://docs.astrbot.app/dev/astrbot-config.html>
-- 会话级 TTS 开关（自定义规则）：<https://docs.astrbot.app/use/custom-rules.html>
-- 成篇的 TTS 使用说明目前只有 v3 文档（概念仍适用）：<https://docs-v3.astrbot.app/use/tts.html>
-- 小米 MiMo 控制台 / 文档：<https://platform.xiaomimimo.com> 、<https://mimo.mi.com/docs>
+  ```
+  [voice_reply] 强制语音回复：概率 1.00；文本上限：300 字
+  ```
 
-## 注意
+---
 
-- **不要同时打开全局 TTS**（`provider_tts_settings.enable`）：全局转换会把所有回复都变语音，
-  再叠加本示例会发两遍。示例代码里已经检测"链里是否已有 `Record`"并跳过，但两个都开属于重复配置。
-- 如果主插件也打开了 `voice_reply_probability`，主插件（priority=100）会先把回复换成语音，
-  本示例（priority=90）看到链里已有 `Record` 就跳过 —— 不会双发，但此时真正生效的是主插件的配置。
-- 本示例会把回复链缩成一条语音，链里的图片 / @ 之类会被丢掉 —— 示例图省事，正式插件请自己取舍。
-- 会话级关掉了 TTS（自定义规则里的「启用 TTS」）不影响本示例，因为本示例直接调 provider。
+## 常见坑
 
-## 关掉"我看得出…"那句话
+| 现象 | 原因 | 怎么办 |
+| --- | --- | --- |
+| 发语音还是回文字，日志有 `没有可用的 TTS` | 「语音回复」没开，或没选默认文本转语音模型 | 按上面的 TTS 步骤打开并选模型（`get_using_tts_provider_async` 此时返回 `None`） |
+| 连**文字**消息也变成语音 | TTS 触发概率不是 0 | 把 **TTS 触发概率** 改成 `0` |
+| 日志有 `流式输出下不会转换语音` | 流式输出开着 | 配置文件 → AI → 流式输出 关掉 |
+| Edge TTS 报缺库 | AstrBot 未内置 `edge-tts` | 「数据与日志 → 日志 → 安装 pip 库」装 `edge-tts` |
+| 长回复不转语音 | 超过 `voice_reply_max_chars`（默认 300） | 调大上限或设 0 |
+| 百炼 TTS 不出声 | 选了 Qwen 系列 | 换成 **Cosy 系列**（Qwen 在 AstrBot 上跑不通） |
+| 平台发不出语音 | 只有 `qq_official` 做过真机验证 | 见 [兼容性](../../README.md#兼容性) |
 
-插件配置里的 `verdict_prefix` 设为 `false`，就只做"语音进 → 语音出"，不再加提示语。
+---
+
+## 想自己写回复策略
+
+主插件已经内置了"语音进 → 语音出"的确定性转换。如果你想自己读 `voice_input`、自己调 provider、
+或者加自己的跳过规则，完整示例代码在：
+
+- [`docs/custom-policy.md`](../../docs/custom-policy.md) —— 一份可直接拷成插件的 `Star` 实现
+- [`docs/configuration.md`](../../docs/configuration.md) —— 与 clonetts 共存、场景矩阵、失败降级
+- [`AGENTS.md`](../../AGENTS.md) —— 给 AI 看的配置说明与回报模板

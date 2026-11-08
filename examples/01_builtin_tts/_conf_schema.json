@@ -1,8 +1,0 @@
-{
-    "verdict_prefix": {
-        "type": "bool",
-        "description": "在回复前加一句“我看得出你这条是语音/文字发的”",
-        "hint": "只是为了让示例效果一眼可见，正式使用可以关掉。",
-        "default": true
-    }
-}

@@ -248,7 +248,7 @@ class VoiceInputPlugin(Star):
 
     @staticmethod
     def _is_streaming(result) -> bool:
-        """流式结果不转换（与 AstrBot 内置 TTS 的行为一致）。"""
+        """流式结果不转换（与框架 TTS 的行为一致）。"""
         content_type = getattr(result, "result_content_type", None)
         return content_type in (
             ResultContentType.STREAMING_RESULT,
@@ -355,8 +355,11 @@ class VoiceInputPlugin(Star):
             return
         self._warned_missing_tts = True
         self.logger.warning(
-            "[voice_reply] 没有可用的 TTS：请到「模型提供商 → 文字转语音」新增一个，"
-            "或安装 astrbot_plugin_clonetts（本插件会复用它的音色配置）%s",
+            "[voice_reply] 没有可用的 TTS：① 到「模型提供商 → 文字转语音」"
+            "新增一个（免费可先用 Edge TTS）；② 到「配置文件 → AI → "
+            "语音回复」打开并选「默认文本转语音模型」，同页「TTS 触发概率」"
+            "设 0（否则文字消息也会变语音）、「流式输出」关掉。"
+            "若在用 clonetts，本插件会复用它的凭据%s",
             f"（{detail}）" if detail else "",
         )
 
@@ -365,7 +368,8 @@ class VoiceInputPlugin(Star):
             return
         self._warned_streaming = True
         self.logger.warning(
-            "[voice_reply] 流式输出下不会转换语音；要强制语音回复请先关闭流式输出。",
+            "[voice_reply] 流式输出下不会转换语音；请到「配置文件 → AI → "
+            "流式输出（在「其他」分组）」关掉。",
         )
 
     # ----------------------------------------------------------------- config
