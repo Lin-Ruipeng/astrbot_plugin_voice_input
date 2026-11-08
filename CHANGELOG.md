@@ -7,6 +7,34 @@
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-08
+
+只改文档、示例与日志文案，插件行为不变。
+
+### Added
+
+- `AGENTS.md`：给"替用户装插件 / 调配置"的机器人看的说明（两个功能、三个配置项与效果、
+  全局前置、推荐配置、验证与回报模板）。
+- `docs/` 拆分为索引 + `configuration.md` / `internals.md` / `development.md` / `custom-policy.md`，
+  搬走原先挤在 README 里的实现细节、共存矩阵与实测记录。
+
+### Changed
+
+- `README.md` / `README.en.md` 重写为使用者视角：两个功能（检测是否语音 / 控制语音回复概率）
+  与各自的配置项放在前面，完整配置表移到末尾；快速上手给出"复制提示词给机器人"与手动四步两条路线。
+- 修正示例 1 的错误说明：`get_using_tts_provider_async()` 在 `provider_tts_settings.enable=false`
+  或未选默认模型时返回 `None`，所以必须打开「配置文件 → AI → 语音回复」并选中模型。
+- TTS 推荐改为 **Edge TTS**（免费，先跑通）→ 百炼 **Cosy 系列**；注明
+  **Qwen 系列在 AstrBot 上跑不通（官方未适配）**。
+- MiMo 归位为 **STT（ASR）** 推荐（`mimo-v2.5-asr`）；它的 TTS（`mimo-v2.5-tts`）也能用。
+- `examples/01_builtin_tts/README.md` 改成配置教学，删除 demo 插件代码（迁至 `docs/custom-policy.md`）。
+- `_warn_no_tts` / `_warn_streaming_once` 的日志文案改为可照做的步骤；**不改任何判定逻辑**。
+
+### Removed
+
+- `examples/01_builtin_tts/` 下的 `main.py` / `metadata.yaml` / `_conf_schema.json`
+  （完整代码见 `docs/custom-policy.md`）。
+
 ## [2.0.0] - 2026-11-06
 
 插件定位从「只检测输入模态」扩展为「检测 + 一个可选的确定性回复策略」。

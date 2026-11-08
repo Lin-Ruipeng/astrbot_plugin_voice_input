@@ -9,7 +9,7 @@ desc: |
   语音消息的回复会在投递前被换成语音（1.0 = 每条语音消息都回语音，0.0 = 关闭），
   没有框架 TTS 时可复用 astrbot_plugin_clonetts 的音色配置。
   目前只在 qq_official 平台实测通过。
-version: 2.0.0
+version: 2.0.1
 author: Lin-Ruipeng
 repo: https://github.com/Lin-Ruipeng/astrbot_plugin_voice_input
 astrbot_version: ">=4.27.3,<5"

@@ -4,12 +4,12 @@
 
 # 语音输入识别（astrbot_plugin_voice_input）
 
-**判断"这条消息是不是语音发来的"。默认只把结论交给你；打开开关后，语音消息的回复会变成语音。**
+**检测用户发来的是不是语音；如果是语音，可以让机器人也用语音回复。**
 
 [![简体中文](https://img.shields.io/badge/文档-简体中文-blue)](README.md)
 [![English](https://img.shields.io/badge/docs-English-blue)](README.en.md)
 [![AstrBot](https://img.shields.io/badge/AstrBot-%3E%3D4.27.3-blue)](https://astrbot.app)
-[![version](https://img.shields.io/badge/version-2.0.0-blue)](metadata.yaml)
+[![version](https://img.shields.io/badge/version-2.0.1-blue)](metadata.yaml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 **简体中文** ｜ [English](README.en.md) ｜ [变更记录](CHANGELOG.md)
@@ -18,83 +18,202 @@
 
 ---
 
-## 它做什么
+## 它能做什么
 
-AstrBot 在预处理阶段就会做语音转文字（STT），并把消息链里的 `Record` 组件**原地替换**成 `Plain`。
-等插件拿到消息时，语音痕迹已经没了 —— 于是"用户刚才是发语音还是打字"这个信息就丢了。
+装上之后，你基本只需要动一处：把 `voice_reply_probability` 从 `0.0` 改成 `1.0`。
+下面两个功能分开看。
 
-本插件做两件事：
+### 功能 1：检测用户输入的是否是语音
 
-1. **判断**：把这条信息捡回来，写进事件，任何插件都能读：
+自动生效，不需要配置。AstrBot 在预处理阶段会把语音转成文字，插件把这层信息捡回来，
+任何插件都能读：
 
-   ```python
-   event.get_extra("voice_input")  # True = 语音，False = 文字
-   ```
+```python
+event.get_extra("voice_input")  # True = 语音，False = 文字
+```
 
-2. **可选的确定性转换**：打开 `voice_reply_probability` 后，语音消息的回复在投递前
-   被换成一条语音。`1.0` = 每条语音消息都回语音，`0.0` = 关闭（默认）。
-
-## 它不做什么
-
-| | |
+| 相关配置 | 说明 |
 | --- | --- |
-| ❌ 默认不改任何回复 | 装完不配置，行为与"只检测"完全一样 |
-| ❌ 不改文字消息的回复 | 只对 `voice_input=True` 的消息抽签，打字进来的一律不动 |
-| ❌ 不内置 TTS 厂商 | 优先用**你配置的框架 TTS 提供商**；没有时复用 `astrbot_plugin_clonetts` 的火山配置（回退） |
-| ❌ 不替你选音色 | 音色由你的 TTS 提供商 / 克隆插件决定 |
+| `verbose_log` | 打开后把每条消息的判定细节写进 debug 日志，排查时用；默认 `false` |
+
+> 检测本身不依赖 STT。但 AI 要**听懂**你说了什么，仍需配一个语音识别模型（见「快速上手」第 2 步）。
+
+### 功能 2：是语音时，控制机器人回复语音的概率
+
+| 配置项 | 默认 | 效果 |
+| --- | --- | --- |
+| `voice_reply_probability` | `0.0` | `0.0` = 关闭；`1.0` = 每条语音消息都回语音；`0.5` = 一半。**只对语音消息生效**，文字消息永远不转 |
+| `voice_reply_max_chars` | `300` | 回复文本超过这个字数就不转语音；`0` = 不限制。太长时 TTS 又慢又贵 |
+
+**有三个全局开关会直接卡住这个功能**（都不在本插件的配置页里）：
+
+| 全局开关 | 位置 | 必须设成 |
+| --- | --- | --- |
+| **语音回复** + **默认文本转语音模型** | 配置文件 → AI → 语音回复 | **开**，并选一个 TTS 模型。不开时本插件拿不到框架 TTS（只装了 clonetts 的话走它的火山回退） |
+| **TTS 触发概率** | 配置文件 → AI → TTS 触发概率 | **`0`**。否则 AstrBot 内置 TTS 会把**文字消息**也转成语音 |
+| **流式输出** | 配置文件 → AI → 流式输出（在「其他」分组） | **关**。流式下内置 TTS 与本插件都不转换 |
+
+### 💡 为什么这样设计
+
+方便发语音的时候，通常也方便听语音 —— 发语音的人，大概率也愿意收到语音回复。
+所以这件事交给插件判断：检测到语音输入，就按概率把回复换成语音，而不是指望模型自己想起来调 TTS 工具。
+
+---
+
+## 快速上手
+
+约 10 分钟。两条路线选一条：**路线 A 复制提示词给机器人**，或**路线 B 自己点**。
+
+### 路线 A（懒人）：把这段发给机器人
+
+前提：WebUI 里给 Agent 打开了沙盒 / 插件安装权限。
+
+```text
+帮我安装并配置 AstrBot 插件「语音输入识别」（astrbot_plugin_voice_input），
+目标是：我发语音时你用语音回复，我发文字时你用文字回复。
+
+1. 安装并启用插件，然后读一下插件目录里的 AGENTS.md。
+2. 检查 STT（语音识别）能不能用：不能用就告诉我怎么配（推荐 MiMo ASR）。
+3. 检查 TTS 能不能用：没有就先用免费的 Edge TTS（缺 edge-tts 库要先装）。
+4. 确认这三个全局开关：配置文件 → AI → 语音回复 = 开且选了默认模型；
+   TTS 触发概率 = 0；流式输出 = 关。
+5. 把插件配置 voice_reply_probability 设为 1.0，voice_reply_max_chars 保持 300。
+6. 用一段话告诉我：你改了什么、还有哪一步需要我手动做、我发语音后应该看到什么日志。
+```
+
+机器人会读 [`AGENTS.md`](AGENTS.md)，把每个配置项的效果用一段话讲清楚；它改不了的地方会告诉你缺哪一步。
+
+### 路线 B（手动）：四步前置链
+
+> 顺序不能反：Agent 权限 → STT → TTS → 本插件。前 3 步都有跳过条件，配过就别重复配。
+
+#### 第 1 步：给机器人 Agent 权限
+
+WebUI 首页 / 系统设置里打开 Agent、沙盒与插件安装权限。
+
+- 之前开过 → **跳过**。
+
+#### 第 2 步：让 STT 能听懂语音
+
+1. 模型提供商 → **语音转文字** → 新增 **MiMo STT(API)**：
+
+   | 字段 | 值 |
+   | --- | --- |
+   | API Key | `sk-` 开头（按量计费）或 `tp-` 开头（Token Plan） |
+   | API Base | `https://api.xiaomimimo.com/v1`（`tp-` Key 用 `https://token-plan-cn.xiaomimimo.com/v1`） |
+   | 模型 | `mimo-v2.5-asr` |
+
+2. 配置文件 → AI → **语音识别**：打开 → **默认语音转文本模型**选它。
+
+- 之前配过，或问机器人"你能听懂我发的语音吗"、它说可以 → **跳过**。
+- MiMo 平台也提供 TTS（`mimo-v2.5-tts` / 音色 `mimo_default`），本步只用到它的 ASR。
+
+#### 第 3 步：让 TTS 能发出语音
+
+1. 模型提供商 → **文字转语音** → 新增 → **Edge TTS**。
+   - 免费、无需 API Key；默认音色 `zh-CN-XiaoxiaoNeural`。
+   - 缺库时：「数据与日志 → 日志」右上角 **安装 pip 库** 填 `edge-tts`；或在容器里
+     `pip install edge-tts` 后重启。
+2. 配置文件 → AI → **语音回复**：打开 → **默认文本转语音模型**选 Edge TTS。
+3. 同一页：**TTS 触发概率改成 `0`**，**流式输出关掉**。
+
+- 之前配过，或问机器人"你能发语音吗"、它说可以 → **跳过**；但仍要确认
+  **触发概率 = 0**、**流式输出 = 关**。
+- 想要更好的音色：换 **阿里云百炼 TTS(API)**，模型用 **Cosy 系列**（如 `cosyvoice-v1`）。
+  **Qwen 系列在 AstrBot 上直接跑不通（官方未适配）**。
+
+#### 第 4 步：打开本插件的开关
+
+WebUI → 插件 → `语音输入识别` → 插件配置：
+
+| 配置项 | 值 |
+| --- | --- |
+| `voice_reply_probability` | `1.0` |
+| `voice_reply_max_chars` | `300`（默认） |
+
+保存并重载插件。
+
+#### 验证
+
+- 发一条**语音** → 收到语音；发一条**文字** → 收到文字。
+- 启动日志里应有一行：
+
+  ```
+  [voice_reply] 强制语音回复：概率 1.00；文本上限：300 字
+  ```
+
+---
+
+## 四种典型配置
+
+| 我想要 | 语音回复 enable | TTS 触发概率 | `voice_reply_probability` |
+| --- | --- | --- | --- |
+| 只检测，不改回复 | 关（或开但触发概率 0） | `0` | `0.0`（默认） |
+| **只有语音消息回语音**（推荐） | 开 + 选默认模型 | `0` | `1.0` |
+| 所有回复都语音 | 开 + 选默认模型 | `1.0` | 任意 |
+| 克隆音色 | 关 / 开皆可 | — | `1.0` + 装 `astrbot_plugin_clonetts` |
+
+第四种会复用克隆插件的音色；两个插件同开时，语音消息由本插件独占，避免同一句合成两次。
+细节见 [配置与共存](docs/configuration.md#和-astrbot_plugin_clonetts-一起用)。
+
+---
+
+## 排错
+
+| 现象 | 先看这里 |
+| --- | --- |
+| 日志没有 `[voice_input]` 行 | 确认 AstrBot >= 4.27.3、插件已启用 |
+| 判定永远为文字 | 打开 `verbose_log`；若三个检测信号都空，多半是平台在预处理前就没把语音交给 AstrBot |
+| 发语音却回文字，日志有 `没有可用的 TTS` | 「语音回复」没开 / 没选默认模型；或没装 clonetts。见第 3 步 |
+| 日志有 `流式输出下不会转换语音` | 配置文件 → AI → 流式输出 关掉 |
+| **文字**消息也被转成语音 | TTS 触发概率不是 0 |
+| 长回复不转语音 | 超过 `voice_reply_max_chars`（默认 300），调大或设 0 |
+| 收到两条语音 / 被合成两次 | 确认 `astrbot_plugin_clonetts` 是 v3.0.4，且本插件 priority 仍是 100 |
+| 百炼 TTS 不出声 | 选了 Qwen 系列（在 AstrBot 上跑不通）；换成 **Cosy 系列** |
+| 想看到三个信号的具体取值 | `verbose_log` 打开，日志级别调到 DEBUG |
+
+更完整的配置解释在 [配置与共存](docs/configuration.md)，实现层的原因在
+[实现细节](docs/internals.md)。
+
+---
+
+## 工作原理（速览）
+
+AstrBot 预处理会把语音转成文字、原地替换掉 `Record`，等插件拿到消息时语音痕迹已经没了。
+本插件用三条信号把它找回来：消息链里残留的 `Record`、平台原始消息里的语音段、
+预处理登记的临时音频文件；能拿到平台原始消息时以它为准（所以"文字引用一条语音"不会被误判）。
+
+打开开关后，在回复生成、尚未投递时（`on_decorating_result`）按概率把纯文本回复换成一条语音；
+同一事件只抽签一次，agent 多轮不会出现"前半段语音、后半段文字"。合成优先用你配置的框架 TTS，
+没有时回退到 `astrbot_plugin_clonetts` 的火山配置，都失败就保留文字。
+
+展开版：[实现细节](docs/internals.md) ｜ 决策记录：[ADR 0002](docs/adr/0002-forced-voice-reply-hook.md)
+
+---
 
 ## 兼容性
 
 | 项 | 说明 |
 | --- | --- |
-| AstrBot | **>= 4.27.3**（判定依赖该版本引入的 `_temporary_local_files`） |
-| **平台** | **只有 `qq_official`（QQ 官方机器人）实测通过。** `aiocqhttp`（OneBot v11 / NapCat / LLOneBot）保留了代码路径但**未实测**；其它平台退化为"临时音频文件后缀"判定，同样未测试 |
-| STT | **不需要开启**。检测独立于 STT；但 AI 要读懂语音内容仍需 STT |
+| AstrBot | **>= 4.27.3**（检测依赖该版本引入的 `_temporary_local_files`） |
+| 平台 | **只有 `qq_official`（QQ 官方机器人）实测通过**；`aiocqhttp`（OneBot v11 / NapCat / LLOneBot）保留了代码路径但未实测；其它平台退化为"临时音频文件后缀"判定，同样未测试 |
+| STT | 检测**不需要**开启；但 AI 要读懂语音内容仍需 STT |
 
-### 实测环境（复现条件）
+实测环境与真机验证记录见 [开发与发布](docs/development.md#实测环境复现基线)。
 
-下表是当前跑通流程的环境，遇到问题时请先对照：
+### 已知限制
 
-| 项 | 值 |
-| --- | --- |
-| 平台 | `qq_official` |
-| AstrBot | 4.29.4（仓库 pyproject；安装元数据 4.28.2） |
-| 音色克隆 | `astrbot_plugin_clonetts` **v3.0.4** |
-| STT | `mimo_stt_api`（`mimo-v2.5-asr`） |
-| 系统 | Debian 13 / Python 3.12 / Docker 容器 |
-| 本插件 | 2.0.0 |
+1. 流式输出下不会转换语音（AstrBot 内置 TTS 同样跳过）。
+2. 命令 / `yield` 类结果、带图片等非纯文本的消息链保持文字，不会转换。
+3. 回复超过 `voice_reply_max_chars` 不转换。
+4. 为了让概率型 TTS 插件干净跳过，转换后 `Record.text` 是空串；某些平台语音发送失败时拿它做文字回退，
+   这时回退文案为空。
+5. 回退到火山 v3 需要 `astrbot_plugin_clonetts` 配置里有 `api_key` / `voice_type`；都没有时只回文字。
+6. 插件本身不产生音频。能不能真的发出语音，取决于框架 TTS 提供商或 clonetts 的火山配置。
 
-## 快速验证
+---
 
-装好后发一条语音、再发一条文字，日志里会各出现一行：
-
-```
-[voice_input] 本轮消息判定为语音输入
-[voice_input] 本轮消息判定为文字输入
-```
-
-打开 `voice_reply_probability` 后，初始化时还会多一行：
-
-```
-[voice_reply] 强制语音回复：概率 1.00；文本上限：300 字
-```
-
-想看到三个信号的具体取值与每次抽签结果，把插件配置里的 `verbose_log` 打开，并把日志级别调到 `DEBUG`。
-
-## 配置
-
-两项都可以在 WebUI「插件配置」里直接改，保存后重载插件生效。
-
-| 项 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `voice_reply_probability` | float | `0.0` | `0.0` = 关闭；`1.0` = 每条语音消息都回语音；`0.5` = 一半。只对语音输入生效 |
-| `voice_reply_max_chars` | int | `300` | 回复文本超过这个字数就不转语音；`0` = 不限制。太长时 TTS 又慢又贵，所以默认给了上限 |
-| `verbose_log` | bool | `false` | 把 has_record / 临时文件 / raw_signal / 抽签结果打到 debug 日志 |
-
-代码对两个数值配置都做了防御：概率钳到 `0.0–1.0`（误填 `80` 这种百分数会 warning 并按 `1.0` 处理），
-字数上限的负数按 `0`（不限制）处理。
-
-### 从 1.0.x 升级到 2.0.0
+## 从 1.0.x 升级到 2.0.0
 
 2.0.0 **移除了** `inject_prompt` / `prompt_text`：让模型"自己决定要不要调 TTS 工具"的思路被实测否定。
 
@@ -102,159 +221,51 @@ AstrBot 在预处理阶段就会做语音转文字（STT），并把消息链里
 | --- | --- |
 | `inject_prompt: true` | 改成 `voice_reply_probability: 1.0`。效果从"靠模型自觉"变成插件确定性转换 |
 | `inject_prompt: false`（默认） | 不用改，默认就是 `0.0` |
-| `prompt_text: ...` | 删除。软提示路径已移除；想在提示词里提一句仍可由你自己的插件做 |
+| `prompt_text: ...` | 删除。软提示路径已移除 |
 | 依赖 `examples/02_clone_tts_prompt` 的注入 | 换成主插件开关；该示例保留为对照 |
 
 旧配置文件里残留的 `inject_prompt` / `prompt_text` 会被忽略，不会报错，可以手动删掉。
 
-## 语音进 → 语音出 是怎么实现的
+---
 
-转换发生在 `on_decorating_result`：回复内容已生成、尚未投递。
+## 完整配置项
 
-1. 只对 `voice_input=True` 的消息抽签。**同一个事件只抽一次**，抽签值缓存在事件上，
-   所以 agent 多轮调用不会出现"前半段语音、后半段文字"。
-2. 跳过这些情况：已经有别的插件转过了（链里已有 `Record`）、命令 / `yield` 类结果、
-   流式输出、带图片等非文本组件、没有可朗读文本、超过 `voice_reply_max_chars`。
-3. 合成音频：先问**当前会话的框架 TTS 提供商**；没有（或失败）就回退到
-   **复用 `astrbot_plugin_clonetts` 的 `api_key` / `voice_type` 直连火山引擎 v3**。
-4. 把整条消息链换成一条 `Record`，失败则保留文字。
+本插件在 WebUI「插件配置」里只有三项：
 
-为什么不用"往系统提示词里加一句请用语音回复"：执行主体是模型，可能不调工具、调了但失败，
-长上下文下遵循率还会下降。回复已经生成之后再替换，才是确定性的。
+| 配置项 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `voice_reply_probability` | float | `0.0` | 语音消息回语音的概率。`0.0` 关闭；`1.0` 每条都回；中间值按概率。只对语音输入生效 |
+| `voice_reply_max_chars` | int | `300` | 回复超过这个字数不转语音；`0` = 不限制 |
+| `verbose_log` | bool | `false` | 把判定细节（各信号、抽签结果）打进 debug 日志 |
 
-## 和 astrbot_plugin_clonetts 一起用
+数值有防御：概率钳到 `0.0–1.0`（误填 `80` 会 warning 并按 `1.0` 处理），字数上限的负数按 `0`（不限制）处理。
 
-`astrbot_plugin_clonetts` 也在 `on_decorating_result` 里按自己的概率（`tts_probability`，默认 80）
-把回复转成语音，但它**不区分输入模态**。两个插件同时开着时，如果不做隔离，同一句话可能被
-**合成两次**（两次 TTS 调用、两次费用，最终只发一条，前一次白花）。
+会影响它的 AstrBot 全局项（不在本插件里，见上文「功能 2」与「四种典型配置」）：
 
-本插件的处理是：**检测到 clonetts 时，语音消息由本插件独占**，文字消息仍交给 clonetts 的概率机制。
-实现是三件套，缺一不可：
-
-| 手段 | 作用 |
-| --- | --- |
-| 本插件 `on_decorating_result` 的 priority 是 100，clonetts 是默认的 0 | 本插件先执行，先决定语音消息的模态 |
-| 转换后 `Record.text` 写成空串 | clonetts 用 `hasattr(component, "text")` 收集文本，空串会让它走"文本为空，跳过"分支 |
-| 没转成时把结果类型降级为普通结果 | clonetts 与 AstrBot 内置 TTS 的 `is_llm_result()` 检查失败，都不会再合成一次 |
-
-场景矩阵（只针对**语音消息**）：
-
-| `voice_reply_probability` | 是否装 clonetts | 结果 |
+| 位置 | 配置项 | 建议 |
 | --- | --- | --- |
-| `0.0`（默认） | 任意 | 本插件完全不介入，语音消息交给 clonetts 自己的概率 |
-| `0 < p < 1`，抽中 | 任意 | 本插件合成，clonetts 取不到文本，跳过 |
-| `0 < p < 1`，未抽中 | 装了 | 本插件标记独占，clonetts 与内置 TTS 都不转，保持文字 |
-| `0 < p < 1`，未抽中 | 没装 | 保持文字（不降级；其它插件抢不抢无所谓） |
-| `1.0` | 任意 | 语音消息必由本插件转语音；clonetts 的概率只对文字消息生效 |
+| 配置文件 → AI | `provider_tts_settings.enable`（语音回复） | 开 |
+| 配置文件 → AI | `provider_tts_settings.provider_id`（默认文本转语音模型） | 选一个 |
+| 配置文件 → AI | `provider_tts_settings.trigger_probability`（TTS 触发概率） | `0` |
+| 配置文件 → AI | `provider_settings.streaming_response`（流式输出） | 关 |
+| 配置文件 → AI | `provider_stt_settings.enable` / `provider_id`（语音识别） | 开 + 选一个（否则 AI 读不懂语音） |
 
-**代价**：被独占的那条消息不再走 AstrBot 内置 TTS，也不再走"仅 LLM 结果"的分段回复。
-内容安全在钩子之前已完成，回复前缀 / @ / 引用 / 文本转图片不受影响。
+---
 
-这依赖 clonetts 的具体实现（用 `hasattr(c, "text")` 取文本），实测版本是 **v3.0.4**；
-换版本后请重新验证"一句话不会被合成两次"。
+## 更多文档
 
-## 写自己的策略（其它插件怎么用）
+- [文档索引](docs/README.md)
+- [配置与共存](docs/configuration.md) —— TTS 选型、四种组合、与 clonetts 的场景矩阵
+- [实现细节](docs/internals.md) —— 三信号、hook 时序、独占、火山回退
+- [自定义回复策略](docs/custom-policy.md) —— 想自己写时看
+- [开发与发布](docs/development.md)
+- [AGENTS.md](AGENTS.md) —— 给 AI 的配置说明与回报模板
+- [术语表](GLOSSARY.md) ｜ [ADR](docs/adr/) ｜ [变更记录](CHANGELOG.md)
 
-`voice_input` 是普通的 `extra`，任何 `event` 都能读。**读取方的 `priority` 要比 100 小**
-（AstrBot 里数值大的 handler 先执行，本插件是 100）。
+示例目录：[`examples/01_builtin_tts`](examples/01_builtin_tts/)（配置教学）、
+[`examples/02_clone_tts_prompt`](examples/02_clone_tts_prompt/)（可运行示例）。
 
-```python
-from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.provider import ProviderRequest
-from astrbot.api.star import Context, Star
-
-
-class MyVoicePolicy(Star):
-    def __init__(self, context: Context, config: dict | None = None) -> None:
-        super().__init__(context)
-        self.config = config or {}
-
-    @filter.on_llm_request(priority=50)  # < 100：确保 voice_input 已经写好
-    async def on_llm_request(
-        self, event: AstrMessageEvent, req: ProviderRequest
-    ) -> None:
-        if not event.get_extra("voice_input"):
-            return
-        req.system_prompt += "用户这条消息是语音发来的，回答时可以更简短些。"
-```
-
-命令类插件（不走 LLM）在 `on_decorating_result` 里同样能读到这个标志 —— 本插件在两个钩子里都会写。
-
-两个**完整可跑**的示例见 [`examples/`](examples/)：
-
-| 示例 | 效果 | 前置 |
-| --- | --- | --- |
-| [`01_builtin_tts`](examples/01_builtin_tts/) | 发语音 → 用 **AstrBot 自带 TTS** 回语音；发文字 → 回文字 | 配一个 TTS 提供商（推荐小米 MiMo） |
-| [`02_clone_tts_prompt`](examples/02_clone_tts_prompt/) | 发语音 → 用**克隆音色**回语音（靠提示词，不稳定） | 安装 `astrbot_plugin_clonetts` |
-
-2.0.0 起主插件自带同款能力，这两个示例更适合当作"自己写策略"的参考。
-
-## 原理
-
-三条信号，任一命中即为语音；能拿到平台原始消息段时以它为准：
-
-| 信号 | 来源 | 说明 |
-| --- | --- | --- |
-| A 残留 `Record` | `event.get_messages()` | STT 关闭或失败时才成立 |
-| B 原始消息段 | OneBot：`raw_message.message` 含 `type == "record"`；QQ 官方：`raw_message.attachments` 里 `content_type` 以 `voice` 开头（或音频文件名） | 只看"本条消息自己"，被引用的语音不算 |
-| C 临时音频后缀 | `event._temporary_local_files` | 预处理的兜底依据（图片也会登记，故按后缀过滤） |
-
-判定逻辑本身在 [`detection.py`](detection.py)，是不导入 `astrbot` 的纯函数；
-回复策略的抽签与跳过规则在 [`reply_policy.py`](reply_policy.py)，同样可脱机单测。
-
-## 真机验证结论（2026-11-06，qq_official）
-
-测试环境同上表；容器里**没有配置框架 TTS 提供商**，语音走 clonetts 的火山回退。
-
-| 场景 | 结果 |
-| --- | --- |
-| 发送语音（`voice_reply_probability: 1.0`） | ✅ 收到一条语音 |
-| 发送纯文字 | ✅ 文字回复，不转语音 |
-| 文字消息**引用**一条语音 | ✅ 判为文字输入（`raw_signal=False`，临时文件里虽有被引用的音频） |
-| 与 `astrbot_plugin_clonetts` v3.0.4 同开 | ✅ 日志显示已独占，未出现重复合成 |
-
-这次实测修掉了一个 `await` 优先级 bug：`await response.read().splitlines()` 等价于
-`await (response.read().splitlines())`，会先取 `.splitlines()` 再 await，导致火山回退
-**必然失败**并静默退回文字。已修复（先 `await` 再 `splitlines()`），并补了 mock 流的回归测试。
-
-## 已知限制
-
-1. 平台上只有 `qq_official` 实测通过；`aiocqhttp` 代码保留但未实测，其它平台更未测试。
-2. 判定依赖 AstrBot 的 `_temporary_local_files`（>= 4.27.3）。属性缺失时插件会打一条 warning 而不是静默失效。
-3. 检测优先读平台原始消息的**顶层**内容，被引用的语音不计入（1.0.x 的「文字引用语音被误判」已在 2.0.0 修复并实测）。
-   但若某个平台/场景拿不到原始消息，仍会退化为临时音频文件判定，此时引用语音可能被算进来。
-4. **流式输出下不会转换语音**（AstrBot 内置 TTS 同样跳过流式）；需要强制语音回复请先关闭流式输出。
-5. 命令 / `yield` 类结果与带图片等非纯文本的消息链保持文字，不会转换。
-6. 为了让概率型 TTS 插件干净跳过，`Record.text` 写成空串。某些平台在语音发送失败时会拿它做文字回退，
-   这时回退文案为空。
-7. 回退到火山 v3 需要 `astrbot_plugin_clonetts` 的配置里有 `api_key` / `voice_type`；
-   都没有时只回文字并打一条 warning。
-8. 插件本身不产生音频。能不能真的发出语音，取决于框架 TTS 提供商或 clonetts 的火山配置。
-
-## 排错
-
-- 日志一直没有 `[voice_input]` 行 → 确认 AstrBot 版本 >= 4.27.3、插件已启用。
-- 判定永远为 `False` → 打开 `verbose_log`，看是哪个信号没命中；若三个信号都空，多半是平台在预处理前就没把语音交给 AstrBot。
-- 发语音却回文字 → 看 `[voice_reply]` 日志：`概率 0`？抽签没中？文本超长？没有可用 TTS？流式输出？
-- `火山回退失败：'coroutine' object has no attribute 'splitlines'` → 这是修复前的 2.0.0 构建，
-  拉最新代码即可（已修复并补了回归测试）。
-- 想看到失败堆栈 → 打开 `verbose_log`，火山回退的错误信息里会附 traceback。
-- 收到两条语音 / 被合成两次 → 确认 `astrbot_plugin_clonetts` 版本是 v3.0.4，且本插件 priority 仍是 100。
-- 想精确控制比例 → 装了 clonetts 时 `voice_reply_probability` 的中间值也能精确生效（未抽中的会被独占降级），
-  此时文字消息仍按 clonetts 的概率出语音。
-
-## 开发
-
-```bash
-pip install pytest pyyaml packaging ruff
-ruff check . && ruff format --check .
-pytest
-```
-
-变更历史见 [CHANGELOG.md](CHANGELOG.md)。
-
-测试覆盖纯函数判定（检测信号、概率钳值、抽签、跳过规则、火山流式解析）与发布元数据一致性
-（版本号语义化、`repo` 字段、配置项与代码对齐、不再使用废弃的 `@register`），**不需要安装 AstrBot**。
+---
 
 ## 许可
 
