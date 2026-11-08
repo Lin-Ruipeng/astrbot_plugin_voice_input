@@ -30,7 +30,7 @@
 - `examples/01_builtin_tts/README.md` 改成配置教学，删除 demo 插件代码（迁至 `docs/custom-policy.md`）。
 - `_warn_no_tts` / `_warn_streaming_once` 的日志文案改为可照做的步骤；**不改任何判定逻辑**。
 - 文档统一术语：用「框架 TTS」代替「内置 TTS / AstrBot 自带 TTS」（以 `GLOSSARY.md` 为准）；
-  `CHANGELOG` 页脚补上 `2.0.1` 链接。
+  `docs/adr/` 的历史记录与旧版本 CHANGELOG 条目保留原文；`CHANGELOG` 页脚补上 `2.0.1` 链接。
 
 ### Removed
 

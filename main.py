@@ -248,7 +248,7 @@ class VoiceInputPlugin(Star):
 
     @staticmethod
     def _is_streaming(result) -> bool:
-        """流式结果不转换（与 AstrBot 内置 TTS 的行为一致）。"""
+        """流式结果不转换（与框架 TTS 的行为一致）。"""
         content_type = getattr(result, "result_content_type", None)
         return content_type in (
             ResultContentType.STREAMING_RESULT,
