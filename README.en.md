@@ -50,8 +50,8 @@ event.get_extra("voice_input")  # True = voice, False = text
 | Global switch | Where | Required value |
 | --- | --- | --- |
 | **Voice Replies** + **Default Text-to-Speech Model** | Config → AI → Voice Replies | **On**, with a TTS model selected. Without it the plugin cannot get a framework TTS provider (with clonetts installed it falls back to Volcano) |
-| **TTS Trigger Probability** | Config → AI → TTS Trigger Probability | **`0`**. Otherwise AstrBot's built-in TTS converts **text** messages too |
-| **Streaming Output** | Config → AI → Streaming Output (under "Others") | **Off**. Both the built-in TTS and this plugin skip streaming results |
+| **TTS Trigger Probability** | Config → AI → TTS Trigger Probability | **`0`**. Otherwise the framework TTS converts **text** messages too |
+| **Streaming Output** | Config → AI → Streaming Output (under "Others") | **Off**. Both the framework TTS and this plugin skip streaming results |
 
 ### Why it's designed this way
 
@@ -69,22 +69,10 @@ About 10 minutes. Pick one route: **Route A, send a prompt to your bot**, or **R
 
 Prerequisite: the Agent sandbox / plugin-install permission is enabled in the WebUI.
 
-```text
-帮我安装并配置 AstrBot 插件「语音输入识别」（astrbot_plugin_voice_input），
-目标是：我发语音时你用语音回复，我发文字时你用文字回复。
-
-1. 安装并启用插件，然后读一下插件目录里的 AGENTS.md。
-2. 检查 STT（语音识别）能不能用：不能用就告诉我怎么配（推荐 MiMo ASR）。
-3. 检查 TTS 能不能用：没有就先用免费的 Edge TTS（缺 edge-tts 库要先装）。
-4. 确认这三个全局开关：配置文件 → AI → 语音回复 = 开且选了默认模型；
-   TTS 触发概率 = 0；流式输出 = 关。
-5. 把插件配置 voice_reply_probability 设为 1.0，voice_reply_max_chars 保持 300。
-6. 用一段话告诉我：你改了什么、还有哪一步需要我手动做、我发语音后应该看到什么日志。
-```
-
-The prompt is in Chinese because this plugin's docs and most WebUI deployments use Chinese labels;
-translate the menu names if your WebUI is in English. The bot reads [`AGENTS.md`](AGENTS.md) and explains
-each setting in plain language; if it cannot change something, it will tell you which step is left.
+The prompt is kept in Chinese in [README.md → Route A](README.md#路线-a懒人把这段发给机器人):
+AstrBot's WebUI and most bot deployments use Chinese labels, and it refers to the Chinese
+[`AGENTS.md`](AGENTS.md). Copy that block as-is. The bot explains each setting in plain language;
+if it cannot change something, it will tell you which step is left.
 
 ### Route B (manual): a four-step prerequisite chain
 
@@ -211,7 +199,7 @@ See [Development](docs/development.md#实测环境复现基线) for the verified
 
 ### Known limitations
 
-1. Streaming output is never converted (AstrBot's built-in TTS skips it too).
+1. Streaming output is never converted (the framework TTS skips it too).
 2. Command / `yield` results and chains with non-text components (images, etc.) stay text.
 3. Replies longer than `voice_reply_max_chars` are not converted.
 4. After conversion `Record.text` is an empty string so probabilistic TTS plugins skip cleanly. Some

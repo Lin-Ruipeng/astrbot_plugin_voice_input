@@ -35,7 +35,7 @@
 3. 在「插件配置 → 克隆语音」里填这两个值；
 4. 确认 `enable_llm_tool` 是开着的（默认开）——它才提供 `clone_tts` 工具。
 
-> 这个插件**不依赖** AstrBot 自带 TTS，所以不需要配 `provider_tts_settings`。
+> 这个插件**不依赖**框架 TTS，所以不需要配 `provider_tts_settings`。
 
 ### 路线 B：让机器人自己装
 

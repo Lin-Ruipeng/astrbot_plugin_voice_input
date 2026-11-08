@@ -75,7 +75,7 @@ AstrBot 里**数值大的 handler 先执行**。所以：
 2. **`Record.text = ""`**：clonetts 用 `hasattr(component, "text")` 收集文本，空串让它走
    "文本为空，跳过"分支；写 `None` 会在 `"".join([None])` 抛异常。
 3. **没转成时降级 `GENERAL_RESULT`**：让 `result.is_llm_result()` 为 False，
-   clonetts 与内置 TTS 都不会接手。
+   clonetts 与框架 TTS 都不会接手。
 
 这依赖 clonetts 的具体实现，实测版本 **v3.0.4**；对方换实现后需要重新验证。
 
@@ -121,14 +121,14 @@ lines = (await response.read()).splitlines()
   判定退化为 A + B。
 - 只有 `qq_official` 做过真机验证；`aiocqhttp`（OneBot v11 / NapCat / LLOneBot）保留了代码路径
   但未实测；其它平台退化为"临时音频后缀"判定。
-- 流式输出下不转换（与内置 TTS 一致）。
+- 流式输出下不转换（与框架 TTS 一致）。
 
 ## 已知实现层面的取舍
 
 | 取舍 | 影响 |
 | --- | --- |
 | `Record.text` 写空串 | 某些平台语音发送失败时会拿它做文字回退，此时回退文案为空 |
-| 独占时降级结果类型 | 这条消息不再走内置 TTS，也不再走"仅 LLM 结果"的分段回复 |
+| 独占时降级结果类型 | 这条消息不再走框架 TTS，也不再走"仅 LLM 结果"的分段回复 |
 | 只处理全 `Plain` 链 | 带图片 / @ 等组件的回复保持文字，不丢内容 |
 | 转换后整条链只剩 `Record` | 由本插件转换时，图片等组件本来就不会出现（第 5 步已要求全 `Plain`） |
 

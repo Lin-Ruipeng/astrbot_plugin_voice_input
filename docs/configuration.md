@@ -25,7 +25,7 @@ STT 同理（`provider_stt_settings.enable` / `provider_id`）。
 **所以"在模型提供商里加了 TTS" ≠ "插件能用 TTS"**：必须在
 「配置文件 → AI → 语音回复」里打开并选中默认模型。这也是旧版示例文档里最容易误导人的一句。
 
-## 内置 TTS 的自动转换
+## 框架 TTS 的自动转换
 
 `astrbot/core/pipeline/result_decorate/stage.py` 在插件钩子**之后**执行，条件是：
 
@@ -39,9 +39,9 @@ provider_tts_settings.enable
 
 且只转换 `len(text) > 1` 的 `Plain` 组件。由此得到两个实用结论：
 
-1. **`TTS 触发概率` 必须设 `0`**，否则文字消息也会被内置 TTS 转成语音，
+1. **`TTS 触发概率` 必须设 `0`**，否则文字消息也会被框架 TTS 转成语音，
    和本插件"只有语音消息回语音"的语义冲突。
-2. 本插件转换后链里是 `Record`（不是 `Plain`），内置 TTS 的循环会原样保留，**不会二次合成**。
+2. 本插件转换后链里是 `Record`（不是 `Plain`），框架 TTS 的循环会原样保留，**不会二次合成**。
 
 ## 四种典型配置
 
@@ -54,10 +54,10 @@ provider_tts_settings.enable
 
 补充约束：
 
-- **流式输出必须关**：`STREAMING_RESULT` 会被内置 TTS 与本插件同时跳过。
-- **会话级「启用 TTS」开关只影响内置 TTS**：本插件直接调 provider，不受它限制。
+- **流式输出必须关**：`STREAMING_RESULT` 会被框架 TTS 与本插件同时跳过。
+- **会话级「启用 TTS」开关只影响框架 TTS**：本插件直接调 provider，不受它限制。
   想让某个会话完全不出语音，请把插件开关设 `0.0`。
-- `dual_output`（开启 TTS 时同时输出语音和文字）只影响内置 TTS；本插件转换后只发语音。
+- `dual_output`（开启 TTS 时同时输出语音和文字）只影响框架 TTS；本插件转换后只发语音。
 
 ## TTS 提供商选型
 
@@ -81,7 +81,7 @@ provider_tts_settings.enable
 | --- | --- |
 | 本插件 `on_decorating_result` 的 priority 是 100，clonetts 是默认的 0 | 本插件先执行，先决定语音消息的模态 |
 | 转换后 `Record.text` 写成空串 | clonetts 用 `hasattr(component, "text")` 收集文本，空串会让它走"文本为空，跳过"分支 |
-| 没转成时把结果类型降级为 `GENERAL_RESULT` | clonetts 与 AstrBot 内置 TTS 的 `is_llm_result()` 检查失败，都不会再合成一次 |
+| 没转成时把结果类型降级为 `GENERAL_RESULT` | clonetts 与框架 TTS 的 `is_llm_result()` 检查失败，都不会再合成一次 |
 
 场景矩阵（只针对**语音消息**）：
 
@@ -89,11 +89,11 @@ provider_tts_settings.enable
 | --- | --- | --- |
 | `0.0`（默认） | 任意 | 本插件完全不介入，语音消息交给 clonetts 自己的概率 |
 | `0 < p < 1`，抽中 | 任意 | 本插件合成，clonetts 取不到文本，跳过 |
-| `0 < p < 1`，未抽中 | 装了 | 本插件标记独占，clonetts 与内置 TTS 都不转，保持文字 |
+| `0 < p < 1`，未抽中 | 装了 | 本插件标记独占，clonetts 与框架 TTS 都不转，保持文字 |
 | `0 < p < 1`，未抽中 | 没装 | 保持文字（不降级；其它插件抢不抢无所谓） |
 | `1.0` | 任意 | 语音消息必由本插件转语音；clonetts 的概率只对文字消息生效 |
 
-**代价**：被独占的那条消息不再走 AstrBot 内置 TTS，也不再走"仅 LLM 结果"的分段回复。
+**代价**：被独占的那条消息不再走框架 TTS，也不再走"仅 LLM 结果"的分段回复。
 内容安全在钩子之前已完成，回复前缀 / @ / 引用 / 文本转图片不受影响。
 
 这依赖 clonetts 的具体实现（用 `hasattr(c, "text")` 取文本），实测版本是 **v3.0.4**；

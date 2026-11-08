@@ -33,7 +33,7 @@ event.get_extra("voice_input")  # True = 语音，False = 文字
 > 目录名要符合 `astrbot_plugin_` 前缀，且与 `metadata.yaml` 的 `name` 一致。
 
 ```python
-"""示例：读 voice_input，发语音就用 AstrBot 自带 TTS 回语音。
+"""示例：读 voice_input，发语音就用框架 TTS 回语音。
 
 依赖 ``astrbot_plugin_voice_input`` 先把 ``voice_input`` 写到事件上。
 本示例自己调 TTS provider，但仍需要框架里「语音回复」处于开启状态并选好默认模型，
@@ -55,7 +55,6 @@ class VoiceReplyPolicy(Star):
 
     def __init__(self, context: Context, config: dict | None = None) -> None:
         super().__init__(context)
-        self.config = config or {}
 
     @filter.on_decorating_result(priority=90)
     async def on_decorating_result(self, event: AstrMessageEvent) -> None:
@@ -130,7 +129,7 @@ class VoiceReplyPolicy(Star):
 ```yaml
 name: astrbot_plugin_my_voice_reply
 display_name: 语音输入·自定义回复策略
-short_desc: 读 voice_input，用 AstrBot 自带 TTS 回语音（示例）
+short_desc: 读 voice_input，用框架 TTS 回语音（示例）
 version: 1.0.0
 author: your-name
 repo: https://github.com/your-name/your-repo
@@ -146,7 +145,7 @@ astrbot_version: ">=4.27.3,<5"
 | **链里有图片 / @** | 上面的示例会把链缩成一条语音，图片会丢。正式插件请自己决定是保留图片还是只转文本部分 |
 | **失败回退** | `get_audio` 失败 / 返回空路径时保留原文字，不要抛异常让消息发不出去 |
 | **临时文件** | 合成出的音频用 `event.track_temporary_local_file(path)` 登记，交给 AstrBot 事后清理 |
-| **流式输出** | `on_decorating_result` 在流式下仍会被调用，但内置 TTS 与本插件都跳过；自己写时也建议跳过 `STREAMING_RESULT` |
+| **流式输出** | `on_decorating_result` 在流式下仍会被调用，但框架 TTS 与本插件都跳过；自己写时也建议跳过 `STREAMING_RESULT` |
 | **命令 / `yield` 类结果** | 这些不是 LLM 结果，通常不该转语音 |
 
 ## 和主插件同开时的行为

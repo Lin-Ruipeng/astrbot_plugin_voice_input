@@ -63,6 +63,9 @@ CI（`.github/workflows/ci.yml`）在 Python 3.10 / 3.12 上跑 pytest，并用�
 └── tests/
 ```
 
+`examples/01_builtin_tts/` 的目录名沿用历史名称（`builtin_tts` 对应「框架 TTS」），
+现在只放教学文档，没有可执行插件。
+
 ## 发布检查清单
 
 1. **版本号三处一致**：`metadata.yaml`、`pyproject.toml`、`README.md` / `README.en.md` 的 badge。
@@ -100,7 +103,7 @@ CI（`.github/workflows/ci.yml`）在 Python 3.10 / 3.12 上跑 pytest，并用�
 
 ## 文档约定
 
-- `README.md` / `README.en.md` **只面向使用者**：两个功能、快速上手、配置、排错。
+- `README.md` / `README.en.md` **只面向使用者**：两个功能、快速上手、配置、排错，可保留一小节原理速览。
 - `docs/` 放实现、配置矩阵、开发与发布；`docs/adr/` 放决策记录。
 - `AGENTS.md` 放"给 AI 看的"安装 / 配置说明与回报模板。
 - 术语以 `GLOSSARY.md` 为准；新增概念先更新术语表。

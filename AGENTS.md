@@ -40,16 +40,17 @@
 | 前置 | 位置 | 要求 |
 | --- | --- | --- |
 | **STT（语音识别）** | 模型提供商 → 语音转文字；配置文件 → AI → **语音识别** | 打开，并选**默认语音转文本模型**。推荐 MiMo STT(API)：`API Base` `https://api.xiaomimimo.com/v1`、模型 `mimo-v2.5-asr`。不配 STT 也能检测语音，但 AI 读不懂你说了什么 |
-| **TTS（语音合成）** | 模型提供商 → 文字转语音；配置文件 → AI → **语音回复** | 打开，并选**默认文本转语音模型**。免费起点：**Edge TTS**（默认音色 `zh-CN-XiaoxiaoNeural`，需 `edge-tts` 库）。只装 clonetts 时它会走火山回退 |
-| **TTS 触发概率** | 配置文件 → AI → **TTS 触发概率** | 必须设 **0**。否则 AstrBot 内置 TTS 会把**文字消息**也转成语音，和本插件的"只有语音回语音"冲突 |
-| **流式输出** | 配置文件 → AI → **流式输出**（在「其他」分组） | 必须**关**。流式下内置 TTS 与本插件都不转换 |
+| **TTS（语音合成）** | 模型提供商 → 文字转语音；配置文件 → AI → **语音回复** | 打开，并选**默认文本转语音模型**。免费起点：**Edge TTS**（默认音色 `zh-CN-XiaoxiaoNeural`，需 `edge-tts` 库） |
+| **TTS 触发概率** | 配置文件 → AI → **TTS 触发概率** | 必须设 **0**。否则框架 TTS 会把**文字消息**也转成语音，和本插件的"只有语音回语音"冲突 |
+| **流式输出** | 配置文件 → AI → **流式输出**（在「其他」分组） | 必须**关**。流式下框架 TTS 与本插件都不转换 |
 
 关键事实（AstrBot 源码行为，v4.27.3 起一致）：
 
 - 本插件用 `context.get_using_tts_provider_async()` 取 TTS。它在
   `provider_tts_settings.enable == false` 或 `provider_id` 为空时**直接返回 None** ——
-  所以"配了提供商但没开语音回复"等于没配。STT 同理。
-- 内置 TTS 只在 `语音回复=开`、`随机数 <= TTS 触发概率`、非流式时自动转换，
+  所以"配了提供商但没开语音回复"等于没配（只装 clonetts 时例外：本插件会复用它的凭据
+  直连火山引擎，即 [TTS 回退](GLOSSARY.md)）。STT 同理。
+- 框架 TTS 只在 `语音回复=开`、`随机数 <= TTS 触发概率`、非流式时自动转换，
   且只处理纯文本组件。
 
 ### TTS 提供商怎么选
@@ -134,5 +135,5 @@
 - **不要**让默认能力依赖某个 TTS 插件的工具名（`tests/test_metadata.py` 会拦）。
 - 提交前：`ruff check . && ruff format --check .`、`pytest`。
 - 版本号三处同步：`metadata.yaml`、`pyproject.toml`、两份 README 的 badge。
-- 文档约定：`README.md` / `README.en.md` 只面向使用者；实现原理、配置矩阵、开发与发布在
+- 文档约定：`README.md` / `README.en.md` 面向使用者（只保留一小节原理速览）；实现细节、配置矩阵、开发与发布在
   `docs/`；决策记录在 `docs/adr/`；术语以 `GLOSSARY.md` 为准。
