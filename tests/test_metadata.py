@@ -7,6 +7,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+try:  # Python 3.11+
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10（CI 的 matrix 里有这一档）
+    import tomli as tomllib
+
 import pytest
 import yaml
 from packaging.specifiers import SpecifierSet
@@ -34,6 +39,48 @@ def test_required_fields_are_non_empty_strings(metadata: dict[str, Any]) -> None
 
 def test_version_is_semver_without_prefix(metadata: dict[str, Any]) -> None:
     assert SEMVER_RE.match(metadata["version"]), "version 必须是纯语义化版本，不能带 v"
+
+
+def _project_metadata() -> dict[str, Any]:
+    raw = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    return tomllib.loads(raw)["project"]
+
+
+def test_pyproject_version_matches_metadata(metadata: dict[str, Any]) -> None:
+    """项目元数据与发布元数据的版本号必须相等。
+
+    两者分别被 pip / 构建工具与插件市场 / 自动更新读取。不一致时市场里显示的是旧版本，
+    自动更新又会把用户拉到新版本，两边各说各话。
+    """
+
+    project_version = _project_metadata()["version"]
+    assert SEMVER_RE.match(project_version), (
+        f"pyproject 的 version 也要是纯语义化版本：{project_version}"
+    )
+    assert project_version == metadata["version"], (
+        "发布元数据版本不一致："
+        f"pyproject.toml [project].version={project_version}，"
+        f"metadata.yaml version={metadata['version']}；改版本号必须两处同步"
+    )
+
+
+BADGE_RE = re.compile(r"img\.shields\.io/badge/version-(?P<version>[^-)\s]+)-")
+
+
+@pytest.mark.parametrize("readme", ["README.md", "README.en.md"])
+def test_readme_version_badge_matches_metadata(
+    readme: str, metadata: dict[str, Any]
+) -> None:
+    """两份 README 的 version badge 也要跟得上，否则用户看到的版本号是假的。"""
+
+    found = BADGE_RE.findall((ROOT / readme).read_text(encoding="utf-8"))
+    assert len(found) == 1, (
+        f"{readme} 里应恰好有一个 version badge，实际 {len(found)} 个"
+    )
+    assert found[0] == metadata["version"], (
+        f"{readme} 的 version badge={found[0]}，"
+        f"metadata.yaml version={metadata['version']}，两者必须同步"
+    )
 
 
 def test_plugin_name_follows_convention(metadata: dict[str, Any]) -> None:

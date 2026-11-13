@@ -6,6 +6,7 @@
 
 ```bash
 pip install pytest pyyaml packaging ruff
+tomli  # 仅 Python 3.10 需要：3.11+ 用内置 tomllib
 ```
 
 - Python `>= 3.10`（`pyproject.toml`）
@@ -28,11 +29,14 @@ CI（`.github/workflows/ci.yml`）在 Python 3.10 / 3.12 上跑 pytest，并用�
 | `tests/test_detection.py` | 三信号合并、OneBot / QQ 官方原始消息、CQ 码字符串、音频后缀、引用语音不误判 |
 | `tests/test_reply_policy.py` | 概率钳值、字数钳值、抽签、跳过规则、独占 claim / block |
 | `tests/test_clonetts_tts.py` | 火山 v3 流式响应解析、`await` 优先级回归、失败路径 |
-| `tests/test_metadata.py` | 发布元数据一致性（见下） |
+| `tests/test_metadata.py` | 发布元数据一致性、版本号一致（见下） |
 
 `tests/test_metadata.py` 锁住了几件容易回归的事：
 
 - `metadata.yaml` 的必填字段、纯语义化版本号、`repo` 指向 GitHub、`astrbot_version` 范围；
+- **版本号四处一致**：`pyproject.toml`（[项目元数据](../GLOSSARY.md)）的 `[project].version`
+  必等于 `metadata.yaml`（[发布元数据](../GLOSSARY.md)）的 `version`，两份 README 的 version badge 同步；
+  不一致时失败信息直接给出文件名与两个数值；
 - `_conf_schema.json` 恰好是三个键，且都有 `type` / `default` / `description`；
 - 旧配置项 `inject_prompt` / `prompt_text` 不再出现；
 - `main.py` 读取了 schema 里的每个键、不使用废弃的 `@register`、不写死别的插件的工具名。
@@ -46,13 +50,14 @@ CI（`.github/workflows/ci.yml`）在 Python 3.10 / 3.12 上跑 pytest，并用�
 ├── reply_policy.py         # 纯函数：概率 / 抽签 / 跳过 / 独占
 ├── clonetts_tts.py         # 火山 v3 合成（回退路径）
 ├── _conf_schema.json       # 插件配置（WebUI 渲染）
-├── metadata.yaml           # 插件市场元数据
-├── AGENTS.md               # 给"装插件/调配置"的机器人看
+├── metadata.yaml           # 发布元数据（插件市场读它）
+├── AGENTS.md               # 入口：定位 + 文档地图 + 维护约定
 ├── GLOSSARY.md             # 领域术语
 ├── README.md / README.en.md
 ├── docs/
 │   ├── README.md           # 文档索引
-│   ├── configuration.md    # 配置、TTS 选型、与 clonetts 共存
+│   ├── install.md          # 安装、前置、选型、验证（操作）
+│   ├── configuration.md    # 解析规则、共存矩阵、降级（原理）
 │   ├── internals.md        # 实现细节
 │   ├── development.md      # 本文件
 │   ├── custom-policy.md    # 自己写回复策略
@@ -68,9 +73,10 @@ CI（`.github/workflows/ci.yml`）在 Python 3.10 / 3.12 上跑 pytest，并用�
 
 ## 发布检查清单
 
-1. **版本号三处一致**：`metadata.yaml`、`pyproject.toml`、`README.md` / `README.en.md` 的 badge。
+1. **版本号四处一致**：`metadata.yaml`、`pyproject.toml`、`README.md` / `README.en.md` 的 badge。
+   `tests/test_metadata.py` 已经拦这一条，漏改任意一处 `pytest` 会直接报出是哪两份文件。
 2. **CHANGELOG**：`## [x.y.z] - YYYY-MM-DD`，按 Keep a Changelog 分类。
-3. **配置项**：新增 / 删除 `_conf_schema.json` 的键时，同步 `main.py` 的读取与 `AGENTS.md` 的配置表；
+3. **配置项**：新增 / 删除 `_conf_schema.json` 的键时，同步 `main.py` 的读取与 `docs/install.md` 的配置表；
    `tests/test_metadata.py` 会拦"schema 有但 main 没读"。
 4. **文档链接**：README / docs / examples 里的相对链接都要能打开。
 5. `ruff check . && ruff format --check .`、`pytest` 全绿。
@@ -103,7 +109,10 @@ CI（`.github/workflows/ci.yml`）在 Python 3.10 / 3.12 上跑 pytest，并用�
 
 ## 文档约定
 
-- `README.md` / `README.en.md` **只面向使用者**：两个功能、快速上手、配置、排错，可保留一小节原理速览。
-- `docs/` 放实现、配置矩阵、开发与发布；`docs/adr/` 放决策记录。
-- `AGENTS.md` 放"给 AI 看的"安装 / 配置说明与回报模板。
+- `README.md` / `README.en.md` **只面向使用者，且必须自足**：两个功能、快速上手、配置、排错，可保留一小节原理速览。
+  插件市场的安装页直接展示 README，用户不会点转跳链接，所以不要把安装步骤抠到链接后面。
+- `docs/install.md` 放**操作链**：安装、全局前置、TTS 选型、四种典型配置、验证与回报模板。
+- `docs/configuration.md` 放**原理**：解析规则、框架 TTS 条件、共存矩阵、降级、钳值。
+- `docs/` 其余文件放实现与开发发布；`docs/adr/` 放决策记录。
+- `AGENTS.md` 只做**入口**：定位、文档地图、维护约定，不再重复安装步骤。
 - 术语以 `GLOSSARY.md` 为准；新增概念先更新术语表。

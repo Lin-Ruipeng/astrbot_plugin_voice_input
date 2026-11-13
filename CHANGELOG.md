@@ -7,6 +7,23 @@
 
 ## [Unreleased]
 
+### Added
+
+- `docs/install.md`：安装 → 全局前置 → TTS 提供商选型 → 四种典型配置 → 验证 → 向用户汇报，
+  一条完整的操作链；内容从 `AGENTS.md` 与 `docs/configuration.md` 合并搬来。
+- `tests/test_metadata.py`：版本号一致性守门 —— `pyproject.toml` 的 `[project].version` 必须等于
+  `metadata.yaml` 的 `version`，两份 README 的 version badge 也要同步；任一处漂移 `pytest` 直接失败，
+  PR 过不了 CI。
+
+### Changed
+
+- `AGENTS.md` 瘦身为**入口**：定位 + 文档地图 + 仓库维护约定，需要安装请读 `docs/install.md`。
+- `docs/configuration.md` 只讲"为什么"：四种典型配置与 TTS 提供商选型移到 `docs/install.md`，
+  流式输出 / 会话级「启用 TTS」/ `dual_output` 三条边界并入「框架 TTS 的自动转换」。
+- 文档链接同步：`README.md` / `README.en.md` / 文档索引 / 示例 / 自定义回复策略页。
+- `GLOSSARY.md` 区分**项目元数据**（`pyproject.toml`）与**发布元数据**（`metadata.yaml`）。
+- Python 3.10 的测试环境补条件依赖 `tomli`（3.11+ 用内置 `tomllib`）。
+
 ## [2.0.1] - 2026-11-08
 
 只改文档、示例与日志文案，插件行为不变。

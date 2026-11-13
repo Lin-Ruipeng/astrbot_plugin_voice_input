@@ -81,4 +81,4 @@
 
 - [`docs/custom-policy.md`](../../docs/custom-policy.md) —— 一份可直接拷成插件的 `Star` 实现
 - [`docs/configuration.md`](../../docs/configuration.md) —— 与 clonetts 共存、场景矩阵、失败降级
-- [`AGENTS.md`](../../AGENTS.md) —— 给 AI 看的配置说明与回报模板
+- [`AGENTS.md`](../../AGENTS.md) —— 给 AI 助手的入口（安装 / 配置指引见 [`docs/install.md`](../../docs/install.md)）

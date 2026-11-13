@@ -1,7 +1,8 @@
 # 配置与共存
 
 面向已经跑通基础配置、想知道"某个开关为什么必须这样设"的人。
-只想快速用起来，看 [README](../README.md) 的「快速上手」。
+只想快速用起来，看 [README](../README.md) 的「快速上手」；
+想从头装一遍、或按清单逐项配一遍，看 [安装与配置](install.md)。
 
 ## AstrBot 的 TTS / STT 解析规则
 
@@ -43,30 +44,18 @@ provider_tts_settings.enable
    和本插件"只有语音消息回语音"的语义冲突。
 2. 本插件转换后链里是 `Record`（不是 `Plain`），框架 TTS 的循环会原样保留，**不会二次合成**。
 
-## 四种典型配置
-
-| 我想要 | `provider_tts_settings.enable` | `trigger_probability` | `voice_reply_probability` |
-| --- | --- | --- | --- |
-| 只检测，不改回复 | 关（或开但触发概率 `0`） | `0` | `0.0`（默认） |
-| **只有语音消息回语音** | 开 + 选默认模型 | `0` | `1.0` |
-| 所有回复都语音 | 开 + 选默认模型 | `1.0` | 任意 |
-| 克隆音色 | 关 / 开皆可 | — | `1.0` + 装 `astrbot_plugin_clonetts` |
-
-补充约束：
+### 三个容易踩的边界
 
 - **流式输出必须关**：`STREAMING_RESULT` 会被框架 TTS 与本插件同时跳过。
 - **会话级「启用 TTS」开关只影响框架 TTS**：本插件直接调 provider，不受它限制。
   想让某个会话完全不出语音，请把插件开关设 `0.0`。
 - `dual_output`（开启 TTS 时同时输出语音和文字）只影响框架 TTS；本插件转换后只发语音。
 
-## TTS 提供商选型
+## 四种典型配置
 
-| 提供商 | 适合 | 注意 |
-| --- | --- | --- |
-| **Edge TTS** | 先跑通、免费 | 无需 API Key；依赖 `edge-tts` 库（AstrBot 未内置）。安装：「数据与日志 → 日志 → 安装 pip 库」填 `edge-tts`，或容器里 `pip install edge-tts` |
-| **阿里云百炼 TTS(API)** | 更好的中文音色 | 模型必须用 **Cosy 系列**（如 `cosyvoice-v1`，默认音色 `loongstella`）。**Qwen 系列在 AstrBot 上直接跑不通（官方未适配）** |
-| **MiMo TTS** | 已在用 MiMo 的 STT | `mimo-v2.5-tts`、音色 `mimo_default`；与 STT 共用 `https://api.xiaomimimo.com/v1` |
-| **astrbot_plugin_clonetts** | 想要克隆音色 | 见下一节；没有框架 TTS 时会复用它的火山凭据 |
+四种开关组合怎么配、Edge / 百炼 Cosy / MiMo / clonetts 怎么选，都是**操作**，
+已搬到 [安装与配置](install.md#四种典型配置)（选型见 [TTS 提供商选型](install.md#tts-提供商选型)）。
+本文只解释它们为什么必须这样设。
 
 ## 和 astrbot_plugin_clonetts 一起用
 
@@ -119,6 +108,7 @@ provider_tts_settings.enable
 
 ## 相关
 
+- [安装与配置](install.md) —— 装、配、验证、回报的完整操作链
 - [实现细节](internals.md) —— 三信号、hook 时序、独占实现、火山回退
 - [自定义回复策略](custom-policy.md) —— 自己写 `on_decorating_result`
 - [README](../README.md) —— 面向使用者的快速上手与配置表

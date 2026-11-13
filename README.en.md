@@ -256,11 +256,12 @@ configurations" above):
 ## More docs
 
 - [Docs index](docs/README.md)
-- [Configuration and coexistence](docs/configuration.md) — TTS choices, the four combinations, clonetts matrix
+- [Install and configure](docs/install.md) — install, prerequisites, TTS choices, four combinations, verification, reporting template
+- [Configuration and coexistence](docs/configuration.md) — provider resolution, clonetts matrix, fallbacks
 - [Internals](docs/internals.md) — three signals, hook order, exclusive claim, Volcano fallback
 - [Custom reply policy](docs/custom-policy.md) — when you want to write your own
 - [Development](docs/development.md)
-- [AGENTS.md](AGENTS.md) — setup notes and a reporting template for AI assistants
+- [AGENTS.md](AGENTS.md) — entry point for AI assistants (setup lives in docs/install.md)
 - [Glossary](GLOSSARY.md) ｜ [ADR](docs/adr/) ｜ [Changelog](CHANGELOG.md)
 
 Examples: [`examples/01_builtin_tts`](examples/01_builtin_tts/) (setup tutorial),

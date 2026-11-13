@@ -1,7 +1,8 @@
 # 实现细节
 
 面向想读懂代码、改判定逻辑或排查"为什么这条没转语音"的人。
-只想知道怎么用，看 [README](../README.md)；只想知道怎么配，看 [配置与共存](configuration.md)。
+只想知道怎么用，看 [README](../README.md)；只想知道怎么配，看 [安装与配置](install.md)；
+想弄清每个开关为什么必须这样设，看 [配置与共存](configuration.md)。
 
 ## 目录与分层
 
@@ -134,6 +135,7 @@ lines = (await response.read()).splitlines()
 
 ## 相关
 
+- [安装与配置](install.md) —— 安装、全局前置、验证与回报模板
 - [配置与共存](configuration.md)
 - [自定义回复策略](custom-policy.md)
 - [ADR 0002](adr/0002-forced-voice-reply-hook.md)

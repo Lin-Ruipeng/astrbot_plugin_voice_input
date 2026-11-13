@@ -54,6 +54,19 @@ _Avoid_: 语音回复（那只是策略的一个结果）
 仓库 `examples/` 下的教学文档与可运行示例，用来演示某种回复策略或配置方式，不发布到插件市场。
 _Avoid_: 内置功能, 子插件
 
+**版本号（Version number）**：
+本插件同时有两份元数据，`version` 必须字面相等；哪一处漏改，`tests/test_metadata.py` 会让 CI 红。
+_Avoid_: 版本号（不指明是哪一份）
+
+**项目元数据（Project metadata）**：
+`pyproject.toml` 的 `[project]` 段，描述“这个 Python 包是什么”：包名、版本、依赖、pytest / ruff 配置。
+面向 pip 与构建工具，与 AstrBot 无关。
+_Avoid_: 发布元数据（那是 metadata.yaml）
+
+**发布元数据（Publishing metadata）**：
+`metadata.yaml`：插件市场展示与自动更新读的那份，包含插件名、显示名、版本、作者、`repo`、`astrbot_version` 范围。
+_Avoid_: 插件配置（那是 `_conf_schema.json`）
+
 **`inject_prompt` / 语音回复指令**：
 已移除（1.0.x 及更早）。当时靠往系统提示词里追加"请用语音回复"，由模型自己调用 TTS 工具，遵循率不稳定。
 现在改用强制语音回复。

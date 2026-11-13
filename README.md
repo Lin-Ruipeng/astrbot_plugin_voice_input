@@ -255,11 +255,12 @@ AstrBot 预处理会把语音转成文字、原地替换掉 `Record`，等插件
 ## 更多文档
 
 - [文档索引](docs/README.md)
-- [配置与共存](docs/configuration.md) —— TTS 选型、四种组合、与 clonetts 的场景矩阵
+- [安装与配置](docs/install.md) —— 安装、全局前置、TTS 选型、四种组合、验证与回报模板
+- [配置与共存](docs/configuration.md) —— 解析规则、与 clonetts 的场景矩阵、失败降级
 - [实现细节](docs/internals.md) —— 三信号、hook 时序、独占、火山回退
 - [自定义回复策略](docs/custom-policy.md) —— 想自己写时看
 - [开发与发布](docs/development.md)
-- [AGENTS.md](AGENTS.md) —— 给 AI 的配置说明与回报模板
+- [AGENTS.md](AGENTS.md) —— 给 AI 助手的入口（安装指引见 docs/install.md）
 - [术语表](GLOSSARY.md) ｜ [ADR](docs/adr/) ｜ [变更记录](CHANGELOG.md)
 
 示例目录：[`examples/01_builtin_tts`](examples/01_builtin_tts/)（配置教学）、
