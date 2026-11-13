@@ -160,6 +160,7 @@ astrbot_version: ">=4.27.3,<5"
 
 ## 相关
 
-- [配置与共存](configuration.md) —— 与 `astrbot_plugin_clonetts` 的场景矩阵、TTS 选型
+- [安装与配置](install.md) —— 安装、全局前置、TTS 选型、验证与回报模板
+- [配置与共存](configuration.md) —— 与 `astrbot_plugin_clonetts` 的场景矩阵、失败降级
 - [实现细节](internals.md) —— 主插件的三信号、hook 时序、独占机制
-- [AGENTS.md](../AGENTS.md) —— 给 AI 的配置说明与回报模板
+- [AGENTS.md](../AGENTS.md) —— 给 AI 助手的入口
